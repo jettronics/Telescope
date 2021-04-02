@@ -1,0 +1,15 @@
+#####################################
+cmake_minimum_required (VERSION 2.8) 
+project (tracker)
+find_package(raspicam REQUIRED)
+find_package(OpenCV)
+find_package(OpenCV REQUIRED PATHS /usr/local/share/OpenCV NO_DEFAULT_PATH)
+include_directories(${OpenCV_INCLUDE_DIRS})
+IF  ( OpenCV_FOUND AND raspicam_CV_FOUND)
+	MESSAGE(STATUS "COMPILING OPENCV TESTS")
+	add_executable (tracker main.cpp)  
+	target_link_libraries (tracker ${raspicam_CV_LIBS})
+ELSE()
+	MESSAGE(FATAL_ERROR "OPENCV NOT FOUND IN YOUR SYSTEM")
+ENDIF()
+#####################################
