@@ -9,6 +9,8 @@ class Focus
 public:
    enum TurnType { TurnStop = 0, TurnRunRight, TurnRunLeft, 
                    TurnStepRight, TurnStepLeft};
+   enum AutoFocusType { AutoFocusStopped = 0, AutoFocusStart, 
+                        AutoFocusTurn, AutoFocusCheckDir, AutoFocusFindMax };
    
 public:
    Focus();
@@ -28,6 +30,8 @@ private:
                    
 private:
    void driver( TurnType turn );
+   void manualFocus();
+   void autoFocus();
     
 private:
    TurnType turnPre;
@@ -40,6 +44,14 @@ private:
    ProcMessage *procMsg;
    StateType state;
    int timecnt;
+   bool aFocus;
+   double afMeank;
+   double afMeanStart;
+   double afMeanMax;
+   double afDiffInt; 
+   double afDiffOld; 
+   AutoFocusType autoFocusState;
+   int waitCnt;
 };
 
 

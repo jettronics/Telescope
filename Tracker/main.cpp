@@ -42,7 +42,7 @@ int main(int argc, char *argv[])
     ProcMessage msgFocCam; // Server = focus, Client = camera
     ProcMessage msgPosCam; // Server = position, Client = camera
     
-    msgFocCam.init(ProcMessage::UnblockingRead, ProcMessage::UnblockingWrite);
+    msgFocCam.init(ProcMessage::UnblockingAll, ProcMessage::UnblockingAll);
     msgPosCam.init(ProcMessage::UnblockingRead, ProcMessage::UnblockingWrite);
     
     //pid = fork(); 

@@ -45,9 +45,10 @@ private:
    void processStreamMjpeg( Mat image );
    void initStreamMjpeg();
    void initRoi(Point2d pnt);
-   void controlCycleTime();
    string getDateAndTime();
    void stopVideoRecord();
+   void sendFocus();
+   void calcFocus();
     
 private:
    CameraProperties camProps;
@@ -62,7 +63,7 @@ private:
    bool videoMode;
    int photoStable;
    int cameraState;
-   Mat imageout, imagein, imageshot, imagetrack;
+   Mat imageout, imagein, imageshot, imagetrack, imagefocus;
    string writeMjpegHeader;
    string writeMjpegContent;
    bool displayByWindow;
@@ -74,9 +75,15 @@ private:
    Rect2d roi;
    Point2d roipt;
    Ptr<Tracker> tracker;
-   clock_t cycleTimeStart;
    ObjectControl *objectControl;
    Scalar roiColor;
+	float focusDt; 
+	struct timespec focusStart,focusEnd;   
+   bool enAutoFocus; 
+   double meanFocus;
+   double drawScale;
+   Scalar focusColor;
+   int focusPos;
 };
 
 

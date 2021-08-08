@@ -8,6 +8,7 @@
 #include <unistd.h>
 #include <time.h>
 #include <sys/time.h>
+#include <math.h>
 
 #include "procmessage.h"
 #include "focus.h"
@@ -20,6 +21,13 @@ Focus::Focus()
     , procMsg(nullptr)
     , state(StateIdle)
     , timecnt(0)
+    , aFocus(false)
+    , afMeank(0.0)
+    , afMeanStart(0.0)
+    , afMeanMax(0.0)    
+    , afDiffInt(0.0)
+    , autoFocusState(AutoFocusStopped)
+    , waitCnt(0)    
 {
 
 }
@@ -32,6 +40,13 @@ Focus::Focus(ProcMessage *proc)
     , procMsg(proc)
     , state(StateIdle)
     , timecnt(0)
+    , aFocus(false)
+    , afMeank(0.0)
+    , afMeanStart(0.0)
+    , afMeanMax(0.0)    
+    , afDiffInt(0.0)    
+    , autoFocusState(AutoFocusStopped)  
+    , waitCnt(0)
 {
 
 }
@@ -156,6 +171,41 @@ int Focus::processMsg()
     {
         size_t pos;
         
+        if( rec.find("autooff") != string::npos )
+        {
+            aFocus = false;
+            turnLast = turnPre;
+            turnPre = Focus::TurnStop;
+            turnPost = Focus::TurnStop;
+            driver(Focus::TurnStop); 
+            autoFocusState = AutoFocusStopped;
+            cout << "autoFocusState: Stop" << endl;
+        }
+        else
+        if( rec.find("autoon") != string::npos )
+        {
+            aFocus = true;
+            afMeank = 0.0;
+            afMeanStart = 0.0;
+            afMeanMax = 0.0;
+            afDiffInt = 0.0;
+            autoFocusState = AutoFocusStart;              
+            turnPre = Focus::TurnStop;
+            turnPost = Focus::TurnStop;
+            cout << "autoFocusState: Start" << endl;
+        }        
+        else
+        if( rec.find("mean=") != string::npos )
+        {
+            //cout << "rec: " << rec << endl;
+            string mean = rec.substr(pos+5);
+            afMeank = (double)stod(mean);
+            cout << "mean: " << afMeank << endl;
+            //string dtime = rec.substr(rec.find('_')+1, rec.find(';')-1);
+            //double dt = (double)stof(dtime);
+            
+        }
+        else
         if( rec.find("runleft") != string::npos )
         {
             if( turnPre == Focus::TurnRunLeft )
@@ -208,13 +258,162 @@ int Focus::processMsg()
         {
             turnPre = Focus::TurnStop;
         }
-        else
+        
         if( rec.find("exit") != string::npos )
         {
             turnPre = Focus::TurnStop;
             ret = -1;
         }
     }
+    
+    if( aFocus == true )
+    {
+        autoFocus();
+    }
+    else
+    {
+        manualFocus();
+    }
+    
+    return ret;
+}
+
+void Focus::autoFocus()
+{
+    switch( autoFocusState )
+    {
+        case AutoFocusStart:
+        {
+            if( afMeanStart < afMeank )
+            {
+                afMeanStart = afMeank;
+            }
+            waitCnt++;            
+            if( waitCnt >= 7 )
+            {
+                waitCnt = 0;
+                afDiffInt = 0.0;
+                if( (turnLast == Focus::TurnStop) ||
+                    (turnLast == Focus::TurnStepLeft) )
+                {
+                    turnPre = Focus::TurnStepRight;
+                }
+                else
+                {
+                    turnPre = Focus::TurnStepLeft;
+                }
+                cout << "autoFocus: dir: " << turnPre << endl;
+                autoFocusState = AutoFocusCheckDir;
+                cout << "autoFocus: afMeank1: " << afMeanStart << endl;
+                cout << "autoFocusState: CheckDir" << endl;
+            }
+
+            usleep(100000);
+        }
+        break;
+        case AutoFocusCheckDir:
+        {
+            if( afMeanMax < afMeank )
+            {
+                afMeanMax = afMeank;
+            }
+            waitCnt++;
+            if( waitCnt >= 7 )
+            {
+                waitCnt = 0;
+                
+                afDiffInt = (afMeanMax - afMeanStart);
+                cout << "autoFocus: afDiffInt: " << afDiffInt << endl;
+                if( fabs(afDiffInt) < 0.1 )
+                {
+                    // continue check, stay dir
+                    cout << "autoFocusState: CheckDir" << endl;
+                }
+                else
+                {
+                    afDiffOld = (afMeanMax - afMeanStart);
+                    cout << "autoFocus: afDiffOld: " << afDiffOld << endl; 
+                    if( afDiffInt < 0.0 )
+                    {
+                        // wrong direction, decreasing 
+                        // change dir
+                        if( turnPre == Focus::TurnStepRight )
+                        {
+                            turnPre = Focus::TurnStepLeft;
+                        }                        
+                        else
+                        {
+                            turnPre = Focus::TurnStepRight;
+                        }
+                        driver(turnPre);
+                        usleep( 80000 );
+                        driver(Focus::TurnStop);
+                        cout << "autoFocus: change dir: " << turnPre << endl;
+                        autoFocusState = AutoFocusCheckDir;       
+                    }
+                    else
+                    {
+                        cout << "autoFocusState: FindMax" << endl;
+                        autoFocusState = AutoFocusFindMax;                    
+                    }
+                }
+                afMeanMax = 0.0;
+            }
+            driver(turnPre);
+            usleep(40000);
+            driver(Focus::TurnStop);
+            usleep(100000);
+        }
+        break;
+        case AutoFocusFindMax:
+        {
+            if( afMeanMax < afMeank )
+            {
+                afMeanMax = afMeank;
+            }
+            waitCnt++;
+            if( waitCnt >= 7 )
+            {
+                waitCnt = 0;
+                
+                double afDiff = (afMeanMax - afMeanStart);
+                double afDeri = afDiff - afDiffOld;
+                cout << "autoFocus: afDiff: " << afDiff << " afDeri: " << afDeri << endl;
+                afDiffOld = afDiff;     
+                if( /*(fabs(afDeri) < 0.005) &&*/ (afDiff > 0.0) && (afDeri < (-0.01)) )
+                {
+                    // Max found
+                    cout << "autoFocusState: Stopped" << endl;
+                    autoFocusState = AutoFocusStopped;
+                    turnLast = turnPre;
+                    turnPre = Focus::TurnStop;
+                    procMsg->sendServerToClient("autodone");
+                }
+                else
+                {
+                    // continue find, stay dir
+                    cout << "autoFocusState: FindMax" << endl;
+                    autoFocusState = AutoFocusFindMax;
+                }
+                afMeanMax = 0.0;
+            }
+            driver(turnPre);
+            usleep(20000);
+            driver(Focus::TurnStop);
+            usleep(100000);            
+        }
+        case AutoFocusStopped:
+        {
+            usleep(100000);
+        }
+        break;        
+        default:
+        break;
+    }
+}
+
+void Focus::manualFocus()
+{
     if( turnPre != turnPost )
     {
         if( turnPre != TurnStop )
@@ -276,9 +475,8 @@ int Focus::processMsg()
         usleep( 100000 );
     }
     
-    return ret;
+    return;
 }
-
 
 void Focus::driver( TurnType turn )
 {
@@ -317,3 +515,135 @@ void Focus::driver( TurnType turn )
     return;
 }
 
+#if 0            
+            if( dt > 0.001 )
+            {
+                afGradLoc += ((afMeank - afMeank1) / dt);
+            }
+            else
+            {
+                afGradLoc += 0.0;
+            }
+            dtInt1 += dt;
+            afGradCalls++;
+            if( dtInt1 >= 1.0 )
+            {
+                dtInt1 = 0.0;
+                if( afGradCalls > 0 )
+                {
+                    afGradk = afGradLoc / (double)afGradCalls;
+                }
+                else
+                {
+                    afGradk = afGradLoc;
+                }
+                afGradCalls = 0;
+                afGradLoc = 0.0;
+            }
+            if( lowMeanAndGrad == true )
+            {
+                dtInt2 += dt;
+            }
+            else
+            {
+                dtInt2 = 0.0;
+            }
+            cout << "afGrad: " << afGradk << endl; 
+            afGradk1 = afGradk;
+            afMeank1 = afMeank;
+#endif  
+
+#if 0
+void Focus::autoFocus()
+{
+    double driverVolt = 0.0;
+    int onTime, offTime;
+    
+    lowMeanAndGrad = false;
+        
+    if( afMeank <= 1.0 )
+    {
+        driverVolt = 1.0;
+    }
+    else
+    {
+        driverVolt = 1.0 / afMeank;
+    }
+       
+    onTime = (int)(driverVolt * (double)100000.0);
+    
+    if( onTime < 10000 )
+    {
+        onTime = 10000;
+    }
+    else
+    if( onTime > 90000 )
+    {
+        onTime = 90000;
+    }
+    offTime = 100000 - onTime;
+    
+    cout << "Driver on: " << onTime << ", off: " << offTime << endl;
+    
+    if( afGradk > 0.1 )
+    {
+        if( turnPre == Focus::TurnStepLeft )
+        {
+            driver(Focus::TurnStop); 
+            usleep(100000);
+        }
+        turnPre = Focus::TurnStepRight;
+    }
+    else
+    if( afGradk < (-0.1) )
+    {
+        if( turnPre == Focus::TurnStepRight )
+        {
+            driver(Focus::TurnStop); 
+            usleep(100000);
+        } 
+        turnPre = Focus::TurnStepLeft;
+    }
+    else
+    if( fabs(afGradk) < 0.05 )
+    {
+        // if afMeank below x don't stop 
+        if( afMeank <= 1.0 )
+        {
+            lowMeanAndGrad = true;
+            if( dtInt2 >= 5.0 )
+            {
+                dtInt2 = 0.0;
+                if( turnPre == Focus::TurnStop )
+                {
+                    turnPre = Focus::TurnStepRight;
+                }
+                else
+                if( turnPre == Focus::TurnStepRight )
+                {
+                    driver(Focus::TurnStop); 
+                    usleep(100000);
+                    turnPre = Focus::TurnStepLeft;
+                }
+                else
+                {
+                    turnPre = Focus::TurnStop;
+                }
+            }
+        }
+        else
+        {
+            turnPre = Focus::TurnStop;
+        }
+    }
+    cout << "Low Mean and Grad: " << lowMeanAndGrad << endl;
+    cout << "Driver turn: " << turnPre << endl;
+    driver(turnPre); 
+    usleep(onTime);
+    driver(Focus::TurnStop); 
+    usleep(offTime);
+    
+    return;
+}
+#endif
+        

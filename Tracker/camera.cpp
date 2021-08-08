@@ -75,6 +75,12 @@ Camera::Camera()
     , roi(0,0,0,0)
     , roipt(0,0)
     , roiColor(Scalar(255,255,255))
+    , focusDt(0.009)   
+    , enAutoFocus(false)   
+    , meanFocus(0.0) 
+    , drawScale(1.0)
+    , focusColor(Scalar(0,69,255))    
+    , focusPos(20)
 {
     objectControl = new ObjectControl;
 }
@@ -98,6 +104,12 @@ Camera::Camera(TcpSocketCom *control, TcpSocketCom *stream, Focus *focus, Positi
     , roi(0,0,0,0)
     , roipt(0,0)
     , roiColor(Scalar(255,255,255))
+    , focusDt(0.009)  
+    , enAutoFocus(false)   
+    , meanFocus(0.0)
+    , drawScale(1.0) 
+    , focusColor(Scalar(0,69,255)) 
+    , focusPos(20)
 {
     objectControl = new ObjectControl(position);
 }
@@ -121,6 +133,12 @@ Camera::Camera( TcpSocketCom *control, TcpSocketCom *stream, ProcMessage *proc, 
     , roi(0,0,0,0)
     , roipt(0,0)
     , roiColor(Scalar(255,255,255))
+    , focusDt(0.009)   
+    , enAutoFocus(false)  
+    , meanFocus(0.0)  
+    , drawScale(1.0)
+    , focusColor(Scalar(0,69,255))   
+    , focusPos(20)        
 {
     objectControl = new ObjectControl(position);
 }
@@ -145,6 +163,12 @@ Camera::Camera( TcpSocketCom *control, TcpSocketCom *stream, ProcMessage *proc, 
     , roi(0,0,0,0)
     , roipt(0,0)
     , roiColor(Scalar(255,255,255))
+    , focusDt(0.009)    
+    , enAutoFocus(false)     
+    , meanFocus(0.0)  
+    , drawScale(1.0)   
+    , focusColor(Scalar(0,69,255))  
+    , focusPos(20)             
 {
     objectControl = nullptr;
 }
@@ -215,6 +239,9 @@ int Camera::process( void )
                                  to_string((int)camProps.heightVideo) + ";";
                 posMsg->sendClientToServer(strSend);
             }
+            drawScale = camProps.widthVideo / 640.0;
+            focusPos = 20*drawScale;
+            meanFocus = 0.0;
             initRoi(roipt);
             tracker = Tracker::create( TRACKING_METHOD );
             cout<<"ROI Point x: " << roipt.x << ", y: " << roipt.y << endl;
@@ -238,7 +265,6 @@ int Camera::process( void )
                 initStreamMjpeg();
             }
             cameraState = 1;
-            cycleTimeStart = clock();
         }
         else
         {
@@ -281,24 +307,42 @@ int Camera::process( void )
             
             if( runControl == true )
             {
-                //controlCycleTime();
                 //objectControl->process( roipt );
                 string strSend = "roipt=" + to_string((int)roipt.x) + "x" + to_string((int)roipt.y) + ";";
                 posMsg->sendClientToServer(strSend);
                 drawMarker( imagetrack, roipt, Scalar( 255, 255, 255 ), MARKER_CROSS, ((int)roi.width >> 2), 2, 1 );
             }
             
+            if( enAutoFocus == true )
+            {
+                string recFoc = procMsg->receiveClientFromServer();
+                if( recFoc.length() > 1 )
+                {
+                    size_t pos;
+                    if( (pos = recFoc.rfind("autodone")) != string::npos )
+                    {
+                        focusColor = Scalar(0,69,255);
+                        enAutoFocus = false;
+                    }
+                }
+            }
+            calcFocus();
+            if( enAutoFocus == true )
+            {
+                sendFocus();
+            }
+          
             if( recordVideo == true )
             {
                 if( writer != nullptr )
                 {
                     writer->write(imageout);
                 }
-                rectangle( imagetrack, roi, Scalar(0,0,255), 2, 1 );
+                rectangle( imagetrack, roi, Scalar(0,0,255), 2*drawScale, 1 );
             }
             else
             {
-                rectangle( imagetrack, roi, roiColor, 2, 1 );
+                rectangle( imagetrack, roi, roiColor, 2*drawScale, 1 );
             }
         }
         
@@ -364,16 +408,23 @@ int Camera::process( void )
                 cout << "saving picture: " << picturename << endl;
                 imwrite( picturename, imageshot );
                 cout.flush();
-                resize(imageout, imageshot, cv::Size(), 0.25, 0.25);
+                //resize(imageout, imageshot, cv::Size(), 0.25, 0.25);
             }
             else
             if( photoStable == -1 )
             {   
+                cout << "Picture: false" << endl;
+                cameraState = 0;
+                photoStable = STABLE_PHOTO_SHOT;
+                videoMode = true;
+                stopVideoRecord();
+                cam.release();
+                /*
                 if( displayByWindow == false )
                 {
                     processStreamMjpeg( imageshot );
                     usleep(20000);
-                }
+                }*/
             }
         }
     }
@@ -381,26 +432,52 @@ int Camera::process( void )
     return ret;
 }
 
-void Camera::controlCycleTime()
+void Camera::sendFocus()
 {
-    // Call Tracking Control algorithm
-    clock_t cycleTimeStop = clock();
-    double cycleTimeDiff = double(cycleTimeStop - cycleTimeStart)/CLOCKS_PER_SEC;
-    if( cycleTimeDiff < (double)CONTROL_CYCLE_TIME )
+    //string strSend = "mean=" + to_string(meanFocus) + "_" + to_string(focusDt) + ";";
+    string strSend = "mean=" + to_string(meanFocus) + ";";
+    procMsg->sendClientToServer(strSend);
+    return;
+}
+
+void Camera::calcFocus()
+{
+    cvtColor(imageout(roi), imagefocus, CV_RGB2GRAY);
+    
+    Mat imageSobel;
+    //Laplacian(imagefocus, imageSobel, CV_16U);
+    Sobel(imagefocus, imageSobel, CV_16U, 1, 1);
+    //Sobel(imagefocus, imageSobel, CV_16U, 1, 0);
+    
+    double meanFocusLoc = mean(imageSobel)[0];
+    if( enAutoFocus == false )
     {
-        unsigned int waitCycle = (CONTROL_CYCLE_TIME - cycleTimeDiff) * 1000000;
-        //cout << "cycleTimeDiff: " << cycleTimeDiff << endl;
-        //cout << "wait: " << waitCycle << endl;
-        //cout.flush();
-        usleep( waitCycle );
+        //double lowThres = meanFocus * 0.075;
+        if( meanFocus < meanFocusLoc )
+        {
+            meanFocus = meanFocusLoc;
+        }
+        /*else
+        if( (meanFocus-lowThres) > meanFocusLoc ) 
+        {
+            meanFocus = meanFocusLoc;
+        }*/
     }
-    //if( cycleTimeDiff >= (double)CONTROL_CYCLE_TIME )
+    else
     {
-        cycleTimeStart = clock();
-        //cout << "cycleTimeDiff: " << cycleTimeDiff << endl;
-        //cout << "Object: x: " << roipt.x << ", y: " << roipt.y << endl;
-        //cout.flush();
+        meanFocus = meanFocusLoc;
     }
+/*    
+    clock_gettime(CLOCK_REALTIME, &focusEnd); //Save time to end clock
+	focusDt = (focusEnd.tv_sec - focusStart.tv_sec) + (focusEnd.tv_nsec - focusStart.tv_nsec) / 1e9; //Calculate new dt
+	clock_gettime(CLOCK_REALTIME, &focusStart); //Save time to start clock
+*/    
+        
+    //string strFocus;
+    //strFocus = "afMean: " + to_string(meanFocus);
+    //putText(imagetrack, strFocus, Point(20, 50), FONT_HERSHEY_COMPLEX, textScale, textColor, 2);
+    //line(imagetrack, Point(focusPos,focusPos), Point((20+(meanFocus*100))*drawScale,focusPos), focusColor, 5*drawScale, LINE_8);
+    line(imagetrack, Point(focusPos,focusPos), Point(focusPos+(meanFocus*100*drawScale),focusPos), focusColor, 5*drawScale, LINE_8);
     
     return;
 }
@@ -470,27 +547,50 @@ int Camera::setControl( string prop )
     else
     if( (pos = prop.rfind("Focus")) != string::npos )
     {
+        if( (pos = prop.rfind("Focusauto=true")) != string::npos )
+        {
+            cout << "Focus auto: on" << endl;
+            enAutoFocus = true;
+            //meanFocus = 0.0;
+            focusColor = Scalar(0,0,255);
+            clock_gettime(CLOCK_REALTIME, &focusStart);
+            procMsg->sendClientToServer("autoon");
+        }   
+        else
+        if( (pos = prop.rfind("Focusauto=false")) != string::npos )
+        {
+            cout << "Focus auto: off" << endl;
+            meanFocus = 0.0;
+            enAutoFocus = false;
+            focusColor = Scalar(0,69,255);   
+            procMsg->sendClientToServer("autooff");
+        } 
+        else
         if( (pos = prop.rfind("Focusrun=left")) != string::npos )
         {
             cout << "Focus run: left" << endl;
+            meanFocus = 0.0;
             procMsg->sendClientToServer("runleft");
         }   
         else
         if( (pos = prop.rfind("Focusrun=right")) != string::npos )
         {
             cout << "Focus run: right" << endl;
+            meanFocus = 0.0;
             procMsg->sendClientToServer("runright");
         } 
         else
         if( (pos = prop.rfind("Focusstep=left")) != string::npos )
         {
             cout << "Focus step: left" << endl;
+            meanFocus = 0.0;
             procMsg->sendClientToServer("stepleft");
         }   
         else
         if( (pos = prop.rfind("Focusstep=right")) != string::npos )
         {
             cout << "Focus step: right" << endl;
+            meanFocus = 0.0;
             procMsg->sendClientToServer("stepright");
         }  
     }
@@ -522,6 +622,7 @@ int Camera::setControl( string prop )
     {
         if( (pos = prop.rfind("Picture=false")) != string::npos )
         {
+            // Not used anymore
             cout << "Picture: false" << endl;
             cameraState = 0;
             photoStable = STABLE_PHOTO_SHOT;

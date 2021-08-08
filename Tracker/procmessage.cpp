@@ -46,7 +46,11 @@ void ProcMessage::init(blocking_type clienttoserver, blocking_type servertoclien
     {
         fcntl(pipeServerToClient[PipeWrite], F_SETFL, O_NONBLOCK);
     }
-    
+    if( servertoclient == UnblockingAll )
+    {
+        fcntl(pipeServerToClient[PipeRead], F_SETFL, O_NONBLOCK);
+        fcntl(pipeServerToClient[PipeWrite], F_SETFL, O_NONBLOCK);
+    }
 }
    
 void ProcMessage::deInit()
