@@ -49,6 +49,7 @@ private:
    void stopVideoRecord();
    void sendFocus();
    void calcFocus();
+   void changeZoom();
     
 private:
    CameraProperties camProps;
@@ -84,6 +85,9 @@ private:
    double drawScale;
    Scalar focusColor;
    int focusPos;
+   Rect2d zoom;
+   double zoomFactor;
+   double focusLineLength;
 };
 
 

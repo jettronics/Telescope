@@ -13,6 +13,8 @@
 #include "procmessage.h"
 #include "focus.h"
 
+#define MAX_WAIT_COUNT  7
+
 Focus::Focus()
     : turnPre(TurnStop) 
     , turnPost(TurnStop) 
@@ -27,7 +29,8 @@ Focus::Focus()
     , afMeanMax(0.0)    
     , afDiffInt(0.0)
     , autoFocusState(AutoFocusStopped)
-    , waitCnt(0)    
+    , waitCnt(0) 
+    , checkTurn(1) 
 {
 
 }
@@ -47,6 +50,7 @@ Focus::Focus(ProcMessage *proc)
     , afDiffInt(0.0)    
     , autoFocusState(AutoFocusStopped)  
     , waitCnt(0)
+    , checkTurn(1)    
 {
 
 }
@@ -174,7 +178,10 @@ int Focus::processMsg()
         if( rec.find("autooff") != string::npos )
         {
             aFocus = false;
-            turnLast = turnPre;
+            if( turnPre != Focus::TurnStop )
+            {
+                turnLast = turnPre;
+            }
             turnPre = Focus::TurnStop;
             turnPost = Focus::TurnStop;
             driver(Focus::TurnStop); 
@@ -289,11 +296,13 @@ void Focus::autoFocus()
                 afMeanStart = afMeank;
             }
             waitCnt++;            
-            if( waitCnt >= 7 )
+            if( waitCnt >= MAX_WAIT_COUNT )
             {
                 waitCnt = 0;
                 afDiffInt = 0.0;
-                if( (turnLast == Focus::TurnStop) ||
+                afDiffOld = 0.0;
+                checkTurn = 1;
+                /*if( (turnLast == Focus::TurnStop) ||
                     (turnLast == Focus::TurnStepLeft) )
                 {
                     turnPre = Focus::TurnStepRight;
@@ -301,11 +310,20 @@ void Focus::autoFocus()
                 else
                 {
                     turnPre = Focus::TurnStepLeft;
+                }*/
+                // continue with turnLast
+                if( turnLast == Focus::TurnStop) 
+                {
+                    turnPre = Focus::TurnStepRight;
+                }
+                else
+                {
+                    turnPre = turnLast;
                 }
                 cout << "autoFocus: dir: " << turnPre << endl;
-                autoFocusState = AutoFocusCheckDir;
+                autoFocusState = AutoFocusFindMax;
                 cout << "autoFocus: afMeank1: " << afMeanStart << endl;
-                cout << "autoFocusState: CheckDir" << endl;
+                cout << "autoFocusState: FindMax" << endl;
             }
 
             usleep(100000);
@@ -313,18 +331,19 @@ void Focus::autoFocus()
         break;
         case AutoFocusCheckDir:
         {
-            if( afMeanMax < afMeank )
+            if( waitCnt == 0 )
             {
                 afMeanMax = afMeank;
             }
             waitCnt++;
-            if( waitCnt >= 7 )
+            if( waitCnt >= MAX_WAIT_COUNT )
             {
                 waitCnt = 0;
                 
-                afDiffInt = (afMeanMax - afMeanStart);
+                //afDiffInt = (afMeanMax - afMeanStart);
+                afDiffInt = (afMeank - afMeanMax);
                 cout << "autoFocus: afDiffInt: " << afDiffInt << endl;
-                if( fabs(afDiffInt) < 0.1 )
+                if( fabs(afDiffInt) < 0.005 )
                 {
                     // continue check, stay dir
                     cout << "autoFocusState: CheckDir" << endl;
@@ -349,7 +368,8 @@ void Focus::autoFocus()
                         usleep( 80000 );
                         driver(Focus::TurnStop);
                         cout << "autoFocus: change dir: " << turnPre << endl;
-                        autoFocusState = AutoFocusCheckDir;       
+                        cout << "autoFocusState: FindMax" << endl;
+                        autoFocusState = AutoFocusFindMax;       
                     }
                     else
                     {
@@ -372,7 +392,7 @@ void Focus::autoFocus()
                 afMeanMax = afMeank;
             }
             waitCnt++;
-            if( waitCnt >= 7 )
+            if( waitCnt >= MAX_WAIT_COUNT )
             {
                 waitCnt = 0;
                 
@@ -380,7 +400,7 @@ void Focus::autoFocus()
                 double afDeri = afDiff - afDiffOld;
                 cout << "autoFocus: afDiff: " << afDiff << " afDeri: " << afDeri << endl;
                 afDiffOld = afDiff;     
-                if( /*(fabs(afDeri) < 0.005) &&*/ (afDiff > 0.0) && (afDeri < (-0.01)) )
+                if( /*(fabs(afDeri) < 0.005) &&*/ (afDiff > 0.00) && (afDeri < 0.02/*(-0.01)*/) )
                 {
                     // Max found
                     cout << "autoFocusState: Stopped" << endl;
@@ -392,13 +412,57 @@ void Focus::autoFocus()
                 else
                 {
                     // continue find, stay dir
+                    if( ((afDiff < (-0.07)) && (checkTurn == 1)) )
+                    {
+                        // wrong direction, decreasing 
+                        checkTurn = 2;
+                        // change dir
+                        if( turnPre == Focus::TurnStepRight )
+                        {
+                            turnPre = Focus::TurnStepLeft;
+                        }                        
+                        else
+                        {
+                            turnPre = Focus::TurnStepRight;
+                        }
+                        driver(turnPre);
+                        usleep( 80000 );
+                        driver(Focus::TurnStop);
+                        cout << "autoFocus: change dir: " << turnPre << endl;
+
+                    }
+                    else
+                    if( ((afDiff < (-0.7)) && (checkTurn == 2)) )
+                    {
+                        // wrong direction, decreasing 
+                        checkTurn = 0;
+                        // change dir
+                        if( turnPre == Focus::TurnStepRight )
+                        {
+                            turnPre = Focus::TurnStepLeft;
+                        }                        
+                        else
+                        {
+                            turnPre = Focus::TurnStepRight;
+                        }
+                        driver(turnPre);
+                        usleep( 80000 );
+                        driver(Focus::TurnStop);
+                        cout << "autoFocus: change dir: " << turnPre << endl;
+                    }
+                    else                    
+                    if( (afDiff > (-0.04)) && (checkTurn != 1) )
+                    {
+                        // allow Turn 
+                        checkTurn = 1;
+                    }
                     cout << "autoFocusState: FindMax" << endl;
                     autoFocusState = AutoFocusFindMax;
                 }
                 afMeanMax = 0.0;
             }
             driver(turnPre);
-            usleep(20000);
+            usleep(15000);
             driver(Focus::TurnStop);
             usleep(100000);            
         }

@@ -48,10 +48,12 @@ private:
    double afMeank;
    double afMeanStart;
    double afMeanMax;
+   double afMeanFirst;
    double afDiffInt; 
    double afDiffOld; 
    AutoFocusType autoFocusState;
    int waitCnt;
+   int checkTurn;
 };
 
 

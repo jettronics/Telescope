@@ -79,8 +79,11 @@ Camera::Camera()
     , enAutoFocus(false)   
     , meanFocus(0.0) 
     , drawScale(1.0)
-    , focusColor(Scalar(0,69,255))    
+    , focusColor(Scalar(0,165,255))    
     , focusPos(20)
+    , zoom(0,0,0,0)  
+    , zoomFactor(1)  
+    , focusLineLength(0.0)
 {
     objectControl = new ObjectControl;
 }
@@ -108,8 +111,11 @@ Camera::Camera(TcpSocketCom *control, TcpSocketCom *stream, Focus *focus, Positi
     , enAutoFocus(false)   
     , meanFocus(0.0)
     , drawScale(1.0) 
-    , focusColor(Scalar(0,69,255)) 
+    , focusColor(Scalar(0,165,255)) 
     , focusPos(20)
+    , zoom(0,0,0,0)    
+    , zoomFactor(1)    
+    , focusLineLength(0.0)         
 {
     objectControl = new ObjectControl(position);
 }
@@ -137,8 +143,11 @@ Camera::Camera( TcpSocketCom *control, TcpSocketCom *stream, ProcMessage *proc, 
     , enAutoFocus(false)  
     , meanFocus(0.0)  
     , drawScale(1.0)
-    , focusColor(Scalar(0,69,255))   
-    , focusPos(20)        
+    , focusColor(Scalar(0,165,255))   
+    , focusPos(20)   
+    , zoom(0,0,0,0)   
+    , zoomFactor(1)   
+    , focusLineLength(0.0)                
 {
     objectControl = new ObjectControl(position);
 }
@@ -167,8 +176,11 @@ Camera::Camera( TcpSocketCom *control, TcpSocketCom *stream, ProcMessage *proc, 
     , enAutoFocus(false)     
     , meanFocus(0.0)  
     , drawScale(1.0)   
-    , focusColor(Scalar(0,69,255))  
-    , focusPos(20)             
+    , focusColor(Scalar(0,165,255))  
+    , focusPos(20)   
+    , zoom(0,0,0,0)   
+    , zoomFactor(1)  
+    , focusLineLength(0.0)                      
 {
     objectControl = nullptr;
 }
@@ -243,6 +255,7 @@ int Camera::process( void )
             focusPos = 20*drawScale;
             meanFocus = 0.0;
             initRoi(roipt);
+            changeZoom();
             tracker = Tracker::create( TRACKING_METHOD );
             cout<<"ROI Point x: " << roipt.x << ", y: " << roipt.y << endl;
         }
@@ -321,7 +334,7 @@ int Camera::process( void )
                     size_t pos;
                     if( (pos = recFoc.rfind("autodone")) != string::npos )
                     {
-                        focusColor = Scalar(0,69,255);
+                        focusColor = Scalar(0,165,255);
                         enAutoFocus = false;
                     }
                 }
@@ -351,11 +364,11 @@ int Camera::process( void )
             //#ifdef SHOW_CAMERA_WINDOW            
             if( (enableTracker == true) || (recordVideo == true) )
             {
-                imshow("Camera input", imagetrack);
+                imshow("Camera input", imagetrack(zoom));
             }
             else
             {
-                imshow("Camera input", imageout);
+                imshow("Camera input", imageout(zoom));
             }
             //#endif
         }
@@ -373,13 +386,14 @@ int Camera::process( void )
         {
             if( displayByWindow == false )
             {
+                // extend for imagetrack(roi) to zoom
                 if( (enableTracker == true) || (recordVideo == true) )
                 {
-                    processStreamMjpeg( imagetrack );
+                    processStreamMjpeg( imagetrack(zoom) );
                 }
                 else
                 {
-                    processStreamMjpeg( imageout );
+                    processStreamMjpeg( imageout(zoom) );
                 }
             }
             
@@ -477,7 +491,8 @@ void Camera::calcFocus()
     //strFocus = "afMean: " + to_string(meanFocus);
     //putText(imagetrack, strFocus, Point(20, 50), FONT_HERSHEY_COMPLEX, textScale, textColor, 2);
     //line(imagetrack, Point(focusPos,focusPos), Point((20+(meanFocus*100))*drawScale,focusPos), focusColor, 5*drawScale, LINE_8);
-    line(imagetrack, Point(focusPos,focusPos), Point(focusPos+(meanFocus*100*drawScale),focusPos), focusColor, 5*drawScale, LINE_8);
+    line(imagetrack(zoom), Point(focusPos,focusPos), Point(focusPos+(meanFocus*focusLineLength),focusPos), 
+         focusColor, 5*drawScale, LINE_8);
     
     return;
 }
@@ -562,7 +577,7 @@ int Camera::setControl( string prop )
             cout << "Focus auto: off" << endl;
             meanFocus = 0.0;
             enAutoFocus = false;
-            focusColor = Scalar(0,69,255);   
+            focusColor = Scalar(0,165,255);   
             procMsg->sendClientToServer("autooff");
         } 
         else
@@ -731,6 +746,14 @@ int Camera::setControl( string prop )
     }
     else
     {
+        if( (pos = prop.rfind("Zoom=")) != string::npos )
+        {
+            string sub = prop.substr(pos+5);
+            zoomFactor = stoi(sub);
+            changeZoom();
+            cout << "Zoom: " << zoomFactor << endl;
+        }
+
         if( (pos = prop.rfind("Brightness=")) != string::npos )
         {
             string sub = prop.substr(pos+11);
@@ -804,8 +827,26 @@ void Camera::initRoi(Point2d pnt)
     roi.height = roi.width;
     roi.x = pnt.x - (roi.width * 0.5);
     roi.y = pnt.y - (roi.width * 0.5);
-    //roi.x = (camProps.widthVideo * 0.5) - (roi.width * 0.5);
-    //roi.y = (camProps.heightVideo * 0.5) - (roi.width * 0.5);
+    
+}
+
+void Camera::changeZoom()
+{
+    if( zoomFactor == 1 )
+    {
+        zoom.width = camProps.widthVideo;
+        zoom.height = camProps.heightVideo;
+        zoom.x = 0.0;
+        zoom.y = 0.0;        
+    }
+    else
+    {
+        zoom.width = camProps.widthVideo / (double)zoomFactor;
+        zoom.height = camProps.heightVideo / (double)zoomFactor;
+        zoom.x = (camProps.widthVideo - zoom.width) * 0.5;
+        zoom.y = (camProps.heightVideo - zoom.height) * 0.5;         
+    }
+    focusLineLength = 100.0 * drawScale / zoomFactor;
 }
 
 string Camera::getDateAndTime()
