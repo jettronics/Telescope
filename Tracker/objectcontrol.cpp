@@ -31,6 +31,7 @@ ObjectControl::ObjectControl(Position *position)
     , arcsecondsSpeedLimitedOld(0,0)
     , initFlag(true)
     , trackFlag(false)
+    , speedAvail(false)
 {
     speedFieldOut[0] = 0;
     speedFieldOut[1] = 0;
@@ -41,6 +42,7 @@ ObjectControl::ObjectControl(Position *position)
     }
     cycleTimeStart = clock();
     inPosBuf = Point2d(0,0);
+    speedObj = Point2d(0,0);
 }
 
 ObjectControl::ObjectControl(Position *position, ProcMessage *proc)
@@ -57,6 +59,7 @@ ObjectControl::ObjectControl(Position *position, ProcMessage *proc)
     , arcsecondsSpeedLimitedOld(0,0)
     , initFlag(true)
     , trackFlag(false)
+    , speedAvail(false)
 {
     speedFieldOut[0] = 0;
     speedFieldOut[1] = 0;
@@ -67,6 +70,7 @@ ObjectControl::ObjectControl(Position *position, ProcMessage *proc)
     }
     cycleTimeStart = clock();
     inPosBuf = Point2d(0,0);
+    speedObj = Point2d(0,0);
 }
 
 
@@ -87,6 +91,9 @@ void ObjectControl::init(double width, double height)
     ctrlPos.x = 1143.0 * 0.5;
     ctrlPos.y = 857.0 * 0.5;
     
+    inPosBuf.x = width * 0.5;
+    inPosBuf.y = height * 0.5;
+    
     arcsecondsSpeedLimitedOld = Point2i(0,0);
     
     speedFieldOut[0] = 0;
@@ -98,6 +105,7 @@ void ObjectControl::init(double width, double height)
 void ObjectControl::deInit()
 {
     cout << "deInit" << endl;
+    speedAvail = false;
     position->setVariableAzm( 0 );
     position->setVariableAlt( 0 );
 }
@@ -174,6 +182,16 @@ void ObjectControl::process( Point2d inPos )
     Point2i arcsecondsSpeedLimited;
     arcsecondsSpeedLimited = speedLimit( arcsecondsSpeed );
     
+    if( speedAvail == true )
+    {
+        if( (uDiff.y < 3.6) && (uDiff.y > -3.6) && (uDiff.x < 3.6) && (uDiff.x > -3.6) )
+        {
+            speedAvail = false;
+            //arcsecondsSpeedLimited = (speedObj * arcsecondPerPixel);
+            cout << "speedAvail arcsecLim/s = " << speedObj * arcsecondPerPixel << "''/s" << endl;
+        }
+    }
+    
     if( arcsecondsSpeedLimitedOld.x != arcsecondsSpeedLimited.x )
     {
         position->setVariableAzm(arcsecondsSpeedLimited.x);
@@ -203,25 +221,77 @@ int ObjectControl::processMsg()
         size_t pos;
         bool deInitFlag = false;
         
-        if( rec.find("init") != string::npos )
-        {
-            string sub = rec.substr(pos+4);
-            string width = sub.substr(sub.find('=')+1, sub.find('x')-1); 
-            string height = sub.substr(sub.find('x')+1, sub.find(';')-1); 
-            double dwidth = (double)stoi(width);
-            double dheight = (double)stoi(height);
-            cout << "init = " << dwidth << "x" << dheight << endl;
-            init(dwidth, dheight);
-        }
-        else
-        if( rec.find("roipt") != string::npos )
+        //cout << "rec: " << rec << endl;
+        cout.flush();
+        
+        if( (pos = rec.find("speed")) != string::npos )
         {
             string sub = rec.substr(pos+5);
-            string width = sub.substr(sub.find('=')+1, sub.find('x')-1); 
-            string height = sub.substr(sub.find('x')+1, sub.find(';')-1); 
-            inPosBuf.x = stoi(width);
-            inPosBuf.y = (double)stoi(height);
-            trackFlag = true;
+            size_t startchar = sub.find('=');
+            if( startchar != string::npos )
+            {
+                size_t xchar = sub.find('x');
+                if( xchar != string::npos )
+                {
+                    size_t endchar = sub.find(';');
+                    if( endchar != string::npos )
+                    {
+                        string vx = sub.substr(startchar+1, xchar-1); 
+                        string vy = sub.substr(xchar+1, endchar-1); 
+                        speedObj.x = (double)stod(vx);
+                        speedObj.y = (double)stod(vy);
+                        speedAvail = true;
+                        cout << "speed = " << speedObj << endl; 
+                    }
+                }
+            }           
+        }
+        
+        if( (pos = rec.find("init")) != string::npos )
+        {
+            string sub = rec.substr(pos+4);
+            size_t startchar = sub.find('=');
+            if( startchar != string::npos )
+            {
+                size_t xchar = sub.find('x');
+                if( xchar != string::npos )
+                {
+                    size_t endchar = sub.find(';');
+                    if( endchar != string::npos )
+                    {
+                        string width = sub.substr(startchar+1, xchar-1); 
+                        string height = sub.substr(xchar+1, endchar-1); 
+                        double dwidth = (double)stoi(width);
+                        double dheight = (double)stoi(height);
+                        init(dwidth, dheight);
+                        trackFlag = true;
+                    }
+                }
+            }
+        }
+        else
+        if( (pos = rec.find("roipt")) != string::npos )
+        {
+            string sub = rec.substr(pos+5);
+            size_t startchar = sub.find('=');
+            if( startchar != string::npos )
+            {
+                size_t xchar = sub.find('x');
+                if( xchar != string::npos )
+                {
+                    size_t endchar = sub.find(';');
+                    if( endchar != string::npos )
+                    {
+                        if( trackFlag == true )
+                        {
+                            string width = sub.substr(startchar+1, xchar-1); 
+                            string height = sub.substr(xchar+1, endchar-1); 
+                            inPosBuf.x = (double)stoi(width);
+                            inPosBuf.y = (double)stoi(height);
+                        }
+                    }
+                }
+            }
         }
         else
         if( (pos = rec.rfind("rate=")) != string::npos )
@@ -271,18 +341,19 @@ int ObjectControl::processMsg()
             position->setFixedAzm( 0 );
         }  
         else
-        if( rec.find("exit") != string::npos )
+        if( (pos = rec.find("exit")) != string::npos )
         {
             deInit();
             trackFlag = false;
             ret = -1;
         }
         // no else
-        if( rec.find("deInit") != string::npos )
+        if( (pos = rec.find("deInit")) != string::npos )
         {
             deInit();
             trackFlag = false;
         }
+
     }
     
     if( trackFlag == true )

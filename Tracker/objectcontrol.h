@@ -38,6 +38,8 @@ private:
    clock_t cycleTimeStart;
    bool trackFlag;
    Point2d inPosBuf;
+   Point2d speedObj;
+   bool speedAvail;
 };
 
 

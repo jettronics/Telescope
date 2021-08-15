@@ -48,22 +48,31 @@ void Position::init()
     cfsetispeed(&options, B9600);
     cfsetospeed(&options, B9600);
     
-    options.c_cflag |=  (CLOCAL | CREAD); 
+    /*options.c_cflag |=  (CLOCAL | CREAD); 
+    options.c_cflag &=  ~CSIZE; 
+    options.c_cflag &=  ~CSTOPB; 
+    options.c_cflag &=  ~PARENB; 
+    options.c_cflag |=  CS8; */
+    
     options.c_cflag &=  ~CSIZE; 
     options.c_cflag &=  ~CSTOPB; 
     options.c_cflag &=  ~PARENB; 
     options.c_cflag |=  CS8; 
+    options.c_cflag |=  (CLOCAL | CREAD);  
     
-    /*options.c_cflag = B9600 | CS8 | CLOCAL | CREAD; 
-    options.c_iflag = IGNPAR;
-    options.c_oflag = 0;
-    options.c_lflag = 0;*/
-        
-    //tcflush(filestream, TCIFLUSH);
-    tcsetattr(filestream, TCSANOW, &options);
+    options.c_lflag &= ~(ICANON | ECHO | ECHOE | ISIG);
+    options.c_iflag = IGNPAR;           /* Parity-Fehler ignorieren */
+    options.c_oflag &= ~OPOST;          /* setze "raw" Input */
+    options.c_cc[VMIN]  = 0;            /* warten auf min. 0 Zeichen */
+    options.c_cc[VTIME] = 0;            /* Timeout */
+    tcflush(filestream,TCIOFLUSH);              /* Puffer leeren */  
+    tcsetattr(filestream, TCSAFLUSH, &options);     
+    
+    //tcsetattr(filestream, TCSANOW, &options);
+    
     return;
 }
-
+    
 void Position::deInit()
 {
     cout << "Position deinit" << endl;
@@ -244,6 +253,7 @@ void Position::process()
                 //cout << " " << (int)arrBuf[i];
             }
             //cout << endl;
+            cout.flush();
             int rettx = write(filestream, arrBuf, 8);
             arrSend.erase(arrSend.begin()+0);
             if (rettx < 0) 
@@ -252,23 +262,34 @@ void Position::process()
             }
             cout.flush();
         }
-                
+//#if 0                
         int retrx = read(filestream, rxBuffer, 1000);
 
         if( retrx < 0 ) 
         {
             rxBuffer[0] = '\0';
+            cout << "UART RX Error:";
+            cout << hex << " 0x" << retrx << endl;            
         } 
         else 
         if( retrx >= 0) 
         {
             rxBuffer[retrx] = '\0';
-            string rxRead = rxBuffer;
-            cout << "UART RX length: " << retrx << endl;
-            cout << "UART RX data: " << rxRead << endl;
-            cout.flush();
+            //string rxRead = rxBuffer;
+            //cout << "UART RX length: " << retrx << endl;
+            //cout << "UART RX data: " << rxRead << endl;
+            //cout << dec << "UART RX length: " << retrx << endl;
+            /*for( int i=0; i < retrx; i++ )
+            {
+                cout << hex << " 0x" << (int)rxBuffer[i];
+            }
+            if( retrx > 0 )
+            {
+                cout << endl;
+                cout.flush();
+            }*/
         } 
-        
+//#endif        
     }
     return;
 }

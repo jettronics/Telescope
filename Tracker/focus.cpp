@@ -175,7 +175,7 @@ int Focus::processMsg()
     {
         size_t pos;
         
-        if( rec.find("autooff") != string::npos )
+        if( (pos = rec.find("autooff")) != string::npos )
         {
             aFocus = false;
             if( turnPre != Focus::TurnStop )
@@ -189,7 +189,7 @@ int Focus::processMsg()
             cout << "autoFocusState: Stop" << endl;
         }
         else
-        if( rec.find("autoon") != string::npos )
+        if( (pos = rec.find("autoon")) != string::npos )
         {
             aFocus = true;
             afMeank = 0.0;
@@ -202,7 +202,7 @@ int Focus::processMsg()
             cout << "autoFocusState: Start" << endl;
         }        
         else
-        if( rec.find("mean=") != string::npos )
+        if( (pos = rec.find("mean=")) != string::npos )
         {
             //cout << "rec: " << rec << endl;
             string mean = rec.substr(pos+5);
@@ -213,7 +213,7 @@ int Focus::processMsg()
             
         }
         else
-        if( rec.find("runleft") != string::npos )
+        if( (pos = rec.find("runleft")) != string::npos )
         {
             if( turnPre == Focus::TurnRunLeft )
             {
@@ -225,7 +225,7 @@ int Focus::processMsg()
             }
         }
         else
-        if( rec.find("runright") != string::npos )
+        if( (pos = rec.find("runright")) != string::npos )
         {
             if( turnPre == Focus::TurnRunRight )
             {
@@ -237,7 +237,7 @@ int Focus::processMsg()
             }
         }
         else
-        if( rec.find("stepleft") != string::npos )
+        if( (pos = rec.find("stepleft")) != string::npos )
         {
             if( turnPre == Focus::TurnStepLeft )
             {
@@ -249,7 +249,7 @@ int Focus::processMsg()
             }
         }
         else
-        if( rec.find("stepright") != string::npos )
+        if( (pos = rec.find("stepright")) != string::npos )
         {
             if( turnPre == Focus::TurnStepRight )
             {
@@ -261,12 +261,12 @@ int Focus::processMsg()
             }
         }
         else
-        if( rec.find("stop") != string::npos )
+        if( (pos = rec.find("stop")) != string::npos )
         {
             turnPre = Focus::TurnStop;
         }
         
-        if( rec.find("exit") != string::npos )
+        if( (pos = rec.find("exit")) != string::npos )
         {
             turnPre = Focus::TurnStop;
             ret = -1;

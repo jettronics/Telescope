@@ -75,7 +75,7 @@ Camera::Camera()
     , roi(0,0,0,0)
     , roipt(0,0)
     , roiColor(Scalar(255,255,255))
-    , focusDt(0.009)   
+    , roiptDt(0.0)   
     , enAutoFocus(false)   
     , meanFocus(0.0) 
     , drawScale(1.0)
@@ -106,8 +106,10 @@ Camera::Camera(TcpSocketCom *control, TcpSocketCom *stream, Focus *focus, Positi
     , recordVideo(false)
     , roi(0,0,0,0)
     , roipt(0,0)
+    , startRoipt(0,0)
+    , endRoipt(0,0)    
     , roiColor(Scalar(255,255,255))
-    , focusDt(0.009)  
+    , roiptDt(0.0)
     , enAutoFocus(false)   
     , meanFocus(0.0)
     , drawScale(1.0) 
@@ -138,8 +140,10 @@ Camera::Camera( TcpSocketCom *control, TcpSocketCom *stream, ProcMessage *proc, 
     , recordVideo(false)
     , roi(0,0,0,0)
     , roipt(0,0)
+    , startRoipt(0,0)
+    , endRoipt(0,0)    
     , roiColor(Scalar(255,255,255))
-    , focusDt(0.009)   
+    , roiptDt(0.0)
     , enAutoFocus(false)  
     , meanFocus(0.0)  
     , drawScale(1.0)
@@ -171,8 +175,10 @@ Camera::Camera( TcpSocketCom *control, TcpSocketCom *stream, ProcMessage *proc, 
     , recordVideo(false)
     , roi(0,0,0,0)
     , roipt(0,0)
+    , startRoipt(0,0)
+    , endRoipt(0,0)    
     , roiColor(Scalar(255,255,255))
-    , focusDt(0.009)    
+    , roiptDt(0.0)   
     , enAutoFocus(false)     
     , meanFocus(0.0)  
     , drawScale(1.0)   
@@ -309,6 +315,11 @@ int Camera::process( void )
                 runTracker = true;
                 initTracker = false;
                 roiColor = Scalar(0,255,0);
+                roipt.x = ((int)roi.width >> 1) + roi.x;
+                roipt.y = ((int)roi.width >> 1) + roi.y; 
+                roiptDt = 0.0;
+                startRoipt = roipt;
+                clock_gettime(CLOCK_REALTIME, &roiptStart);
                 cout << "Run Tracker" << endl;
             }
             if( runTracker == true )
@@ -316,11 +327,19 @@ int Camera::process( void )
                 tracker->update( imagetrack, roi );
                 roipt.x = ((int)roi.width >> 1) + roi.x;
                 roipt.y = ((int)roi.width >> 1) + roi.y;
+                if( runControl == false )
+                {
+                    endRoipt = roipt;
+                    clock_gettime(CLOCK_REALTIME, &roiptEnd);
+                    roiptDt += (roiptEnd.tv_sec - roiptStart.tv_sec) + 
+                                  (roiptEnd.tv_nsec - roiptStart.tv_nsec) / 1e9; 
+                    clock_gettime(CLOCK_REALTIME, &roiptStart); 
+                }
             }
             
             if( runControl == true )
             {
-                //objectControl->process( roipt );
+                // Call deinit after roipt reached closed to mid of image and start prediction
                 string strSend = "roipt=" + to_string((int)roipt.x) + "x" + to_string((int)roipt.y) + ";";
                 posMsg->sendClientToServer(strSend);
                 drawMarker( imagetrack, roipt, Scalar( 255, 255, 255 ), MARKER_CROSS, ((int)roi.width >> 2), 2, 1 );
@@ -386,7 +405,6 @@ int Camera::process( void )
         {
             if( displayByWindow == false )
             {
-                // extend for imagetrack(roi) to zoom
                 if( (enableTracker == true) || (recordVideo == true) )
                 {
                     processStreamMjpeg( imagetrack(zoom) );
@@ -448,7 +466,6 @@ int Camera::process( void )
 
 void Camera::sendFocus()
 {
-    //string strSend = "mean=" + to_string(meanFocus) + "_" + to_string(focusDt) + ";";
     string strSend = "mean=" + to_string(meanFocus) + ";";
     procMsg->sendClientToServer(strSend);
     return;
@@ -459,38 +476,22 @@ void Camera::calcFocus()
     cvtColor(imageout(roi), imagefocus, CV_RGB2GRAY);
     
     Mat imageSobel;
-    //Laplacian(imagefocus, imageSobel, CV_16U);
     Sobel(imagefocus, imageSobel, CV_16U, 1, 1);
     //Sobel(imagefocus, imageSobel, CV_16U, 1, 0);
     
     double meanFocusLoc = mean(imageSobel)[0];
     if( enAutoFocus == false )
     {
-        //double lowThres = meanFocus * 0.075;
         if( meanFocus < meanFocusLoc )
         {
             meanFocus = meanFocusLoc;
         }
-        /*else
-        if( (meanFocus-lowThres) > meanFocusLoc ) 
-        {
-            meanFocus = meanFocusLoc;
-        }*/
     }
     else
     {
         meanFocus = meanFocusLoc;
     }
-/*    
-    clock_gettime(CLOCK_REALTIME, &focusEnd); //Save time to end clock
-	focusDt = (focusEnd.tv_sec - focusStart.tv_sec) + (focusEnd.tv_nsec - focusStart.tv_nsec) / 1e9; //Calculate new dt
-	clock_gettime(CLOCK_REALTIME, &focusStart); //Save time to start clock
-*/    
         
-    //string strFocus;
-    //strFocus = "afMean: " + to_string(meanFocus);
-    //putText(imagetrack, strFocus, Point(20, 50), FONT_HERSHEY_COMPLEX, textScale, textColor, 2);
-    //line(imagetrack, Point(focusPos,focusPos), Point((20+(meanFocus*100))*drawScale,focusPos), focusColor, 5*drawScale, LINE_8);
     line(imagetrack(zoom), Point(focusPos,focusPos), Point(focusPos+(meanFocus*focusLineLength),focusPos), 
          focusColor, 5*drawScale, LINE_8);
     
@@ -518,7 +519,6 @@ int Camera::setControl( string prop )
             cout << "Position: up" << endl;
             //position->setFixedAlt( 1 );
             posMsg->sendClientToServer("alt=1");
-            runControl = false;
         }  
         
         if( (pos = prop.rfind("Position=down")) != string::npos )
@@ -526,7 +526,6 @@ int Camera::setControl( string prop )
             cout << "Position: down" << endl;
             //position->setFixedAlt( -1 );
             posMsg->sendClientToServer("alt=-1");
-            runControl = false;
         }  
         
         if( (pos = prop.rfind("Position=left")) != string::npos )
@@ -534,7 +533,6 @@ int Camera::setControl( string prop )
             cout << "Position: left" << endl;
             //position->setFixedAzm( -1 );
             posMsg->sendClientToServer("azm=-1");
-            runControl = false;
         }  
         
         if( (pos = prop.rfind("Position=right")) != string::npos )
@@ -542,7 +540,6 @@ int Camera::setControl( string prop )
             cout << "Position: right" << endl;
             //position->setFixedAzm( 1 );
             posMsg->sendClientToServer("azm=1");
-            runControl = false;
         }  
         
         if( (pos = prop.rfind("Position=stopud")) != string::npos )
@@ -568,7 +565,6 @@ int Camera::setControl( string prop )
             enAutoFocus = true;
             //meanFocus = 0.0;
             focusColor = Scalar(0,0,255);
-            clock_gettime(CLOCK_REALTIME, &focusStart);
             procMsg->sendClientToServer("autoon");
         }   
         else
@@ -728,19 +724,32 @@ int Camera::setControl( string prop )
         if( (pos = prop.rfind("Tracker=ctrl")) != string::npos )
         {
             cout << "Tracker: ctrl" << endl;
-            if( runControl == false )
+            if( runTracker == true ) 
             {
-                runControl = true;
-                //objectControl->init( camProps.widthVideo, camProps.heightVideo );
-                string strSend = "init=" + to_string((int)camProps.widthVideo) + "x" + 
-                                 to_string((int)camProps.heightVideo) + ";";
-                posMsg->sendClientToServer(strSend);
-            }
-            else
-            {
-                runControl = false;
-                //objectControl->deInit();
-                posMsg->sendClientToServer("deInit");
+                if( runControl == false )
+                {
+                    runControl = true;
+                    string strSend = "init=" + to_string((int)camProps.widthVideo) + "x" + 
+                                     to_string((int)camProps.heightVideo) + ";";
+                    posMsg->sendClientToServer(strSend);
+                    cout << "Tracker: ctrl roiptDt=" << roiptDt << endl;
+                    Point2d speedRoipt = Point2d(0,0);
+                    if( roiptDt > 0.5 )
+                    {
+                        speedRoipt = (endRoipt - startRoipt) / roiptDt;
+                    }
+                    cout << "Tracker: ctrl speed=" << speedRoipt << endl;
+                    string strSpeed = "speed=" + to_string(speedRoipt.x) + "x" + to_string(speedRoipt.y) + ";";
+                    posMsg->sendClientToServer(strSpeed);
+                }
+                else
+                {
+                    roiptDt = 0.0;
+                    startRoipt = roipt;
+                    clock_gettime(CLOCK_REALTIME, &roiptStart);
+                    runControl = false;
+                    posMsg->sendClientToServer("deInit");
+                }
             }
         }
     }
