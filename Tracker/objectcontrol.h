@@ -16,11 +16,12 @@ public:
 public:
    void init(double width, double height);
    void deInit();
-   void process( Point2d inPos );
+   void process();
    int processMsg();
 
 private:
    Point2i speedLimit(Point2i speed);
+   Point2i speedMax(Point2i speed);
    void controlCycleTime();
    
 private:
@@ -39,7 +40,9 @@ private:
    bool trackFlag;
    Point2d inPosBuf;
    Point2d speedObj;
-   bool speedAvail;
+   Point2i arcsecondsSpeedPredict;
+   Point2i arcsecondsSpeedPT1;   
+   bool predictCalc;
 };
 
 

@@ -73,12 +73,10 @@ private:
    bool runTracker, runControl;
    bool recordVideo;
    Rect2d roi;
-   Point2d roipt, startRoipt, endRoipt;
+   Point2d roipt;
    Ptr<Tracker> tracker;
    ObjectControl *objectControl;
    Scalar roiColor;
-	float roiptDt; 
-	struct timespec roiptEnd, roiptStart;   
    bool enAutoFocus; 
    double meanFocus;
    double drawScale;

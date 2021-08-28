@@ -21,8 +21,8 @@ ObjectControl::ObjectControl()
 ObjectControl::ObjectControl(Position *position)
     : position(position)
     , ctrlPos(0,0)
-    , Kp(0.4)//Kp(0.5)
-    , Ti(0.015)//Ti(0.009)
+    , Kp(0.2)//Kp(0.4) Kp(0.5)
+    , Ti(0.005)//Ti(0.015) Ti(0.009)
     , Td(0.5)
     , width(0)
     , height(0)
@@ -31,7 +31,9 @@ ObjectControl::ObjectControl(Position *position)
     , arcsecondsSpeedLimitedOld(0,0)
     , initFlag(true)
     , trackFlag(false)
-    , speedAvail(false)
+    , arcsecondsSpeedPredict(0,0)
+    , arcsecondsSpeedPT1(0,0)
+    , predictCalc(false)
 {
     speedFieldOut[0] = 0;
     speedFieldOut[1] = 0;
@@ -41,7 +43,7 @@ ObjectControl::ObjectControl(Position *position)
         deltaInPos[i] = Point2d(0,0);
     }
     cycleTimeStart = clock();
-    inPosBuf = Point2d(0,0);
+    inPosBuf = Point2d(0.0,0.0);
     speedObj = Point2d(0,0);
 }
 
@@ -49,9 +51,9 @@ ObjectControl::ObjectControl(Position *position, ProcMessage *proc)
     : position(position)
     , procMsg(proc)
     , ctrlPos(0,0)
-    , Kp(0.4)//Kp(0.5)
-    , Ti(0.015)//Ti(0.009)
-    , Td(0.5)
+    , Kp(0.2)//Kp(0.4) Kp(0.5)
+    , Ti(0.005)//Ti(0.015) Ti(0.009)
+    , Td(0.5) //Object speed -> 8 entries every 0.25s = 2s -> 0.5 1/s
     , width(0)
     , height(0)
     , uKiOld(0,0)
@@ -59,7 +61,9 @@ ObjectControl::ObjectControl(Position *position, ProcMessage *proc)
     , arcsecondsSpeedLimitedOld(0,0)
     , initFlag(true)
     , trackFlag(false)
-    , speedAvail(false)
+    , arcsecondsSpeedPredict(0,0)
+    , arcsecondsSpeedPT1(0,0)    
+    , predictCalc(false)
 {
     speedFieldOut[0] = 0;
     speedFieldOut[1] = 0;
@@ -69,7 +73,7 @@ ObjectControl::ObjectControl(Position *position, ProcMessage *proc)
         deltaInPos[i] = Point2d(0,0);
     }
     cycleTimeStart = clock();
-    inPosBuf = Point2d(0,0);
+    inPosBuf = Point2d(0.0,0.0);
     speedObj = Point2d(0,0);
 }
 
@@ -93,8 +97,11 @@ void ObjectControl::init(double width, double height)
     
     inPosBuf.x = width * 0.5;
     inPosBuf.y = height * 0.5;
+    cout << dec << "Init inPosBuf = " << inPosBuf << endl;
     
     arcsecondsSpeedLimitedOld = Point2i(0,0);
+    arcsecondsSpeedPredict = Point2i(0,0);
+    arcsecondsSpeedPT1 = Point2i(0,0);
     
     speedFieldOut[0] = 0;
     speedFieldOut[1] = 0;
@@ -105,14 +112,17 @@ void ObjectControl::init(double width, double height)
 void ObjectControl::deInit()
 {
     cout << "deInit" << endl;
-    speedAvail = false;
+    predictCalc = false;
     position->setVariableAzm( 0 );
     position->setVariableAlt( 0 );
+    //position->setFixedAzm( 0 );
+    //position->setFixedAlt( 0 );
 }
 
-void ObjectControl::process( Point2d inPos )
+void ObjectControl::process()
 {
-    Point2d inPosArc = inPos * arcsecondPerPixel;
+    Point2d inPosArc = arcsecondPerPixel * inPosBuf;
+    //cout << dec << "inPosArc = " << inPosArc << "''" << endl;
     
     if( initFlag == true )
     {
@@ -123,8 +133,10 @@ void ObjectControl::process( Point2d inPos )
         initFlag = false;
     }
     Point2d uDiff = inPosArc - ctrlPos;
+    //cout << "uDiff = " << uDiff << "''" << endl;
     
     Point2d uKp = Kp * uDiff;
+    //cout << "uKp = " << uKp << "''/s" << endl;
     
     Point2d uKi = (Ti * uDiff)+uKiOld;
     if( uKi.x >= 35.7 )
@@ -170,41 +182,50 @@ void ObjectControl::process( Point2d inPos )
         deltaInPos[7-i] = deltaInPos[6-i];
     }
     deltaInPos[0] = inPosArc;
+    //cout << "uKi = " << uKi << "''/s" << endl;
     Point2d uKd = Td * (deltaInPos[0]-deltaInPos[7]); 
     //cout << "uKd = " << uKd << "''/s" << endl;
     
     Point2d uPID = uKp + uKi + uKd;
     //cout << "uPID = " << uPID << "''/s" << endl;
     
-    Point2i arcsecondsSpeed = static_cast<Point2i>(uPID);   
+    Point2i arcsecondsSpeed = static_cast<Point2i>(uPID);  
+    arcsecondsSpeed.y = -arcsecondsSpeed.y; 
     //cout << "arcsec/s = " << arcsecondsSpeed << "''/s" << endl;
     
     Point2i arcsecondsSpeedLimited;
-    arcsecondsSpeedLimited = speedLimit( arcsecondsSpeed );
+    arcsecondsSpeedLimited = speedMax( arcsecondsSpeed );
+    //arcsecondsSpeedLimited = speedLimit( arcsecondsSpeed );
     
-    if( speedAvail == true )
+    //cout << "uDiff = " << uDiff << "''" << endl;
+    if( predictCalc == false )
     {
-        if( (uDiff.y < 3.6) && (uDiff.y > -3.6) && (uDiff.x < 3.6) && (uDiff.x > -3.6) )
-        {
-            speedAvail = false;
-            //arcsecondsSpeedLimited = (speedObj * arcsecondPerPixel);
-            cout << "speedAvail arcsecLim/s = " << speedObj * arcsecondPerPixel << "''/s" << endl;
-        }
+        Point2i arcsecondsSpeedTemp;
+        arcsecondsSpeedTemp.x = arcsecondsSpeedPredict.x + (0.02 * (arcsecondsSpeedLimited.x - arcsecondsSpeedPredict.x));
+        arcsecondsSpeedTemp.y = arcsecondsSpeedPredict.y + (0.02 * (arcsecondsSpeedLimited.y - arcsecondsSpeedPredict.y));
+        arcsecondsSpeedPredict = arcsecondsSpeedTemp;
+        //cout << "Mean arcsecLim/s = " << arcsecondsSpeedPredict << "''/s" << endl;
+        //cout << "Act  arcsecLim/s = " << arcsecondsSpeedLimited << "''/s" << endl;
+    }
+    else
+    {
+        arcsecondsSpeedLimited = arcsecondsSpeedPredict;
+        //cout << "Predict arcsecLim/s = " << arcsecondsSpeedLimited << "''/s" << endl;
     }
     
-    if( arcsecondsSpeedLimitedOld.x != arcsecondsSpeedLimited.x )
+    //if( arcsecondsSpeedLimitedOld.x != arcsecondsSpeedLimited.x )
     {
         position->setVariableAzm(arcsecondsSpeedLimited.x);
-        cout << "arcsecLim/s = " << arcsecondsSpeedLimited << "''/s" << endl;
+        //cout << dec << "arcsecLim/s = " << arcsecondsSpeedLimited << "''/s" << endl;
     }
     
-    if( arcsecondsSpeedLimitedOld.y != arcsecondsSpeedLimited.y )
+    //if( arcsecondsSpeedLimitedOld.y != arcsecondsSpeedLimited.y )
     {
         position->setVariableAlt(arcsecondsSpeedLimited.y);
-        cout << "arcsecLim/s = " << arcsecondsSpeedLimited << "''/s" << endl;
+        //cout << dec << "arcsecLim/s = " << arcsecondsSpeedLimited << "''/s" << endl;
     }
         
-    arcsecondsSpeedLimitedOld = arcsecondsSpeedLimited;
+    //arcsecondsSpeedLimitedOld = arcsecondsSpeedLimited;
     
     return;
 }
@@ -224,29 +245,11 @@ int ObjectControl::processMsg()
         //cout << "rec: " << rec << endl;
         cout.flush();
         
-        if( (pos = rec.find("speed")) != string::npos )
+        if( (pos = rec.find("notrack")) != string::npos )
         {
-            string sub = rec.substr(pos+5);
-            size_t startchar = sub.find('=');
-            if( startchar != string::npos )
-            {
-                size_t xchar = sub.find('x');
-                if( xchar != string::npos )
-                {
-                    size_t endchar = sub.find(';');
-                    if( endchar != string::npos )
-                    {
-                        string vx = sub.substr(startchar+1, xchar-1); 
-                        string vy = sub.substr(xchar+1, endchar-1); 
-                        speedObj.x = (double)stod(vx);
-                        speedObj.y = (double)stod(vy);
-                        speedAvail = true;
-                        cout << "speed = " << speedObj << endl; 
-                    }
-                }
-            }           
+            predictCalc = true;
         }
-        
+        else
         if( (pos = rec.find("init")) != string::npos )
         {
             string sub = rec.substr(pos+4);
@@ -264,7 +267,6 @@ int ObjectControl::processMsg()
                         double dwidth = (double)stoi(width);
                         double dheight = (double)stoi(height);
                         init(dwidth, dheight);
-                        trackFlag = true;
                     }
                 }
             }
@@ -282,13 +284,12 @@ int ObjectControl::processMsg()
                     size_t endchar = sub.find(';');
                     if( endchar != string::npos )
                     {
-                        if( trackFlag == true )
-                        {
-                            string width = sub.substr(startchar+1, xchar-1); 
-                            string height = sub.substr(xchar+1, endchar-1); 
-                            inPosBuf.x = (double)stoi(width);
-                            inPosBuf.y = (double)stoi(height);
-                        }
+                        string width = sub.substr(startchar+1, xchar-1); 
+                        string height = sub.substr(xchar+1, endchar-1); 
+                        inPosBuf.x = (double)stoi(width);
+                        inPosBuf.y = (double)stoi(height);
+                        trackFlag = true;
+                        predictCalc = false;
                     }
                 }
             }
@@ -317,7 +318,7 @@ int ObjectControl::processMsg()
         else
         if( (pos = rec.rfind("azm=-1")) != string::npos )
         {
-            cout << "Position: left" << endl;
+            cout << "azm=-1" << endl;
             position->setFixedAzm( -1 );
             trackFlag = false;
         }  
@@ -358,7 +359,7 @@ int ObjectControl::processMsg()
     
     if( trackFlag == true )
     {
-        process(inPosBuf);
+        process();
     }
     
     return ret;
@@ -416,6 +417,37 @@ Point2i ObjectControl::speedLimit(Point2i speed)
     return retSpeed;
 }
 
+Point2i ObjectControl::speedMax(Point2i speed)
+{
+    Point2i retSpeed;
+    
+    retSpeed = speed;
+    if( abs(speed.x) > 100 )
+    {
+        if( speed.x < 0 ) 
+        {
+            retSpeed.x = -100;
+        }
+        else
+        {
+            retSpeed.x = 100;
+        }
+    }
+    if( abs(speed.y) > 100 )
+    {
+        if( speed.y < 0 ) 
+        {
+            retSpeed.y = -100;
+        }
+        else
+        {
+            retSpeed.y = 100;
+        }
+    }
+        
+    return retSpeed;
+}
+
 void ObjectControl::controlCycleTime()
 {
     // Call Tracking Control algorithm
@@ -429,13 +461,13 @@ void ObjectControl::controlCycleTime()
         //cout.flush();
         usleep( waitCycle );
     }
-    //if( cycleTimeDiff >= (double)CONTROL_CYCLE_TIME )
-    {
-        cycleTimeStart = clock();
-        //cout << "cycleTimeDiff: " << cycleTimeDiff << endl;
-        //cout << "Object: x: " << roipt.x << ", y: " << roipt.y << endl;
-        //cout.flush();
-    }
+    
+    cycleTimeStart = clock();
+    //cout << "cycleTimeDiff: " << cycleTimeDiff << endl;
+    //cout << "waitTimeDiff: " << waitTimeDiff << endl;
+    //cout << "Object: x: " << roipt.x << ", y: " << roipt.y << endl;
+    //cout.flush();
+
     
     return;
 }

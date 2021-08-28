@@ -10,7 +10,7 @@ public:
    enum TurnType { TurnStop = 0, TurnRunRight, TurnRunLeft, 
                    TurnStepRight, TurnStepLeft};
    enum AutoFocusType { AutoFocusStopped = 0, AutoFocusStart, 
-                        AutoFocusTurn, AutoFocusCheckDir, AutoFocusFindMax };
+                        AutoFocusFindMax };
    
 public:
    Focus();
@@ -53,7 +53,8 @@ private:
    double afDiffOld; 
    AutoFocusType autoFocusState;
    int waitCnt;
-   int checkTurn;
+   int waitTurnThres;
+   int waitTurn;
 };
 
 

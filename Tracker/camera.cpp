@@ -31,7 +31,7 @@
 #define OPENCV_WAIT_FOR_KEY 20
 #define STABLE_PHOTO_SHOT (100/OPENCV_WAIT_FOR_KEY)
 #define ROI_WIDTH_RATIO 0.15
-#define CONTROL_CYCLE_TIME 0.25
+//#define CONTROL_CYCLE_TIME 0.25
 #define TRACKING_METHOD "KCF"
 //#define TRACKING_METHOD "MIL"
 
@@ -75,7 +75,6 @@ Camera::Camera()
     , roi(0,0,0,0)
     , roipt(0,0)
     , roiColor(Scalar(255,255,255))
-    , roiptDt(0.0)   
     , enAutoFocus(false)   
     , meanFocus(0.0) 
     , drawScale(1.0)
@@ -106,10 +105,7 @@ Camera::Camera(TcpSocketCom *control, TcpSocketCom *stream, Focus *focus, Positi
     , recordVideo(false)
     , roi(0,0,0,0)
     , roipt(0,0)
-    , startRoipt(0,0)
-    , endRoipt(0,0)    
     , roiColor(Scalar(255,255,255))
-    , roiptDt(0.0)
     , enAutoFocus(false)   
     , meanFocus(0.0)
     , drawScale(1.0) 
@@ -140,10 +136,7 @@ Camera::Camera( TcpSocketCom *control, TcpSocketCom *stream, ProcMessage *proc, 
     , recordVideo(false)
     , roi(0,0,0,0)
     , roipt(0,0)
-    , startRoipt(0,0)
-    , endRoipt(0,0)    
     , roiColor(Scalar(255,255,255))
-    , roiptDt(0.0)
     , enAutoFocus(false)  
     , meanFocus(0.0)  
     , drawScale(1.0)
@@ -175,10 +168,7 @@ Camera::Camera( TcpSocketCom *control, TcpSocketCom *stream, ProcMessage *proc, 
     , recordVideo(false)
     , roi(0,0,0,0)
     , roipt(0,0)
-    , startRoipt(0,0)
-    , endRoipt(0,0)    
     , roiColor(Scalar(255,255,255))
-    , roiptDt(0.0)   
     , enAutoFocus(false)     
     , meanFocus(0.0)  
     , drawScale(1.0)   
@@ -317,23 +307,30 @@ int Camera::process( void )
                 roiColor = Scalar(0,255,0);
                 roipt.x = ((int)roi.width >> 1) + roi.x;
                 roipt.y = ((int)roi.width >> 1) + roi.y; 
-                roiptDt = 0.0;
-                startRoipt = roipt;
-                clock_gettime(CLOCK_REALTIME, &roiptStart);
                 cout << "Run Tracker" << endl;
             }
             if( runTracker == true )
             {
-                tracker->update( imagetrack, roi );
-                roipt.x = ((int)roi.width >> 1) + roi.x;
-                roipt.y = ((int)roi.width >> 1) + roi.y;
-                if( runControl == false )
+                if( ((roi.x > 20) && ((roi.x + roi.width) < (camProps.widthVideo - 20))) &&
+                    ((roi.y > 20) && ((roi.y + roi.height) < (camProps.heightVideo - 20))) )
                 {
-                    endRoipt = roipt;
-                    clock_gettime(CLOCK_REALTIME, &roiptEnd);
-                    roiptDt += (roiptEnd.tv_sec - roiptStart.tv_sec) + 
-                                  (roiptEnd.tv_nsec - roiptStart.tv_nsec) / 1e9; 
-                    clock_gettime(CLOCK_REALTIME, &roiptStart); 
+                    tracker->update( imagetrack, roi );
+                    roipt.x = ((int)roi.width >> 1) + roi.x;
+                    roipt.y = ((int)roi.width >> 1) + roi.y;
+                }
+                else
+                {
+                    initTracker = false;
+                    runTracker = false;
+                    if( runControl == true )
+                    {
+                        posMsg->sendClientToServer("deInit");
+                    }
+                    runControl = false;
+                    roipt.x = camProps.widthVideo / 2;
+                    roipt.y = camProps.heightVideo / 2;
+                    initRoi(roipt);
+                    roiColor = Scalar(255,255,255);
                 }
             }
             
@@ -645,8 +642,8 @@ int Camera::setControl( string prop )
         if( (pos = prop.rfind("Picture=true")) != string::npos )
         {
             cout << "Picture: true" << endl;
-            //objectControl->deInit();
-            posMsg->sendClientToServer("deInit");
+            //posMsg->sendClientToServer("deInit");
+            posMsg->sendClientToServer("notrack");
             cameraState = 0;
             photoStable = STABLE_PHOTO_SHOT;
             videoMode = false;
@@ -715,6 +712,11 @@ int Camera::setControl( string prop )
             cout << "Tracker: stop" << endl;
             initTracker = false;
             runTracker = false;
+            if( runControl == true )
+            {
+                posMsg->sendClientToServer("deInit");
+            }
+            runControl = false;
             roipt.x = camProps.widthVideo / 2;
             roipt.y = camProps.heightVideo / 2;
             initRoi(roipt);
@@ -732,21 +734,9 @@ int Camera::setControl( string prop )
                     string strSend = "init=" + to_string((int)camProps.widthVideo) + "x" + 
                                      to_string((int)camProps.heightVideo) + ";";
                     posMsg->sendClientToServer(strSend);
-                    cout << "Tracker: ctrl roiptDt=" << roiptDt << endl;
-                    Point2d speedRoipt = Point2d(0,0);
-                    if( roiptDt > 0.5 )
-                    {
-                        speedRoipt = (endRoipt - startRoipt) / roiptDt;
-                    }
-                    cout << "Tracker: ctrl speed=" << speedRoipt << endl;
-                    string strSpeed = "speed=" + to_string(speedRoipt.x) + "x" + to_string(speedRoipt.y) + ";";
-                    posMsg->sendClientToServer(strSpeed);
                 }
                 else
                 {
-                    roiptDt = 0.0;
-                    startRoipt = roipt;
-                    clock_gettime(CLOCK_REALTIME, &roiptStart);
                     runControl = false;
                     posMsg->sendClientToServer("deInit");
                 }

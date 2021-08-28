@@ -26,15 +26,23 @@ public:
 private:
    int filestream;
    //vector<string> strSend;
-   vector<array<char, 8>> arrSend;
+   //vector<array<char, 8>> arrSend;
    char rxBuffer[1024];
    char arrBuf[8];
+   char arrBufAlt[8];
+   char arrBufAzm[8];
    char fixedRate;
    char lastDirVarAzm;
    char lastDirVarAlt;
    char lastDirFixAzm;
    char lastDirFixAlt;
-    
+   bool msgReceived;
+   bool sendAzm;
+   int waitReceived;
+   bool waitTurnAzm;
+   int waitTurnAzmCount;
+   bool waitTurnAlt;
+   int waitTurnAltCount;    
 };
 
 
