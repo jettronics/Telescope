@@ -14,6 +14,7 @@
 #include <vector>
 #include <opencv2/opencv.hpp>
 #include <opencv2/tracking.hpp>
+#include <opencv2/plot.hpp>
 #include <raspicam/raspicam_cv.h>
 #include <raspicam/raspicam.h>
 

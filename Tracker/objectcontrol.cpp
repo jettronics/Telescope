@@ -247,6 +247,7 @@ int ObjectControl::processMsg()
         
         if( (pos = rec.find("notrack")) != string::npos )
         {
+            cout << "notrack: " << arcsecondsSpeedPredict << endl;
             predictCalc = true;
         }
         else

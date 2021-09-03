@@ -17,6 +17,7 @@
 
 #include <opencv2/opencv.hpp>
 #include <opencv2/tracking.hpp>
+#include <opencv2/plot.hpp>
 #include <raspicam/raspicam_cv.h>
 #include <raspicam/raspicam.h>
 
@@ -79,7 +80,7 @@ Camera::Camera()
     , meanFocus(0.0) 
     , drawScale(1.0)
     , focusColor(Scalar(0,165,255))    
-    , focusPos(20)
+    , focusPos(30)
     , zoom(0,0,0,0)  
     , zoomFactor(1)  
     , focusLineLength(0.0)
@@ -110,7 +111,7 @@ Camera::Camera(TcpSocketCom *control, TcpSocketCom *stream, Focus *focus, Positi
     , meanFocus(0.0)
     , drawScale(1.0) 
     , focusColor(Scalar(0,165,255)) 
-    , focusPos(20)
+    , focusPos(30)
     , zoom(0,0,0,0)    
     , zoomFactor(1)    
     , focusLineLength(0.0)         
@@ -141,7 +142,7 @@ Camera::Camera( TcpSocketCom *control, TcpSocketCom *stream, ProcMessage *proc, 
     , meanFocus(0.0)  
     , drawScale(1.0)
     , focusColor(Scalar(0,165,255))   
-    , focusPos(20)   
+    , focusPos(30)   
     , zoom(0,0,0,0)   
     , zoomFactor(1)   
     , focusLineLength(0.0)                
@@ -173,12 +174,30 @@ Camera::Camera( TcpSocketCom *control, TcpSocketCom *stream, ProcMessage *proc, 
     , meanFocus(0.0)  
     , drawScale(1.0)   
     , focusColor(Scalar(0,165,255))  
-    , focusPos(20)   
+    , focusPos(30)   
     , zoom(0,0,0,0)   
     , zoomFactor(1)  
     , focusLineLength(0.0)                      
 {
     objectControl = nullptr;
+
+/*        
+    osci1.clear();
+
+    for( int t = 0; t < 400; t++ )
+    { 
+        osci1.push_back(0);
+    }
+
+    namedWindow( "Plot1", CV_WINDOW_NORMAL );
+
+    Mat data1( osci1 );
+    plot1 = plot::createPlot2d( data1 );
+
+    plot1->setMaxY(200);
+    plot1->setMinY(-5);
+*/
+
 }
 
 Camera::~Camera()
@@ -248,7 +267,7 @@ int Camera::process( void )
                 posMsg->sendClientToServer(strSend);
             }
             drawScale = camProps.widthVideo / 640.0;
-            focusPos = 20*drawScale;
+            focusPos = 30*drawScale;
             meanFocus = 0.0;
             initRoi(roipt);
             changeZoom();
@@ -417,6 +436,7 @@ int Camera::process( void )
                 // End tracker
                 cam.release();
                 ret = -1;
+                destroyAllWindows();
             }
         }
         else
@@ -426,21 +446,21 @@ int Camera::process( void )
                 photoStable--;
             }
             else
-            if( photoStable == 0 )
+            if( photoStable > (-10) )
             {    
                 string picturename;
                                 
                 imageshot = imageout.clone();
-                photoStable = -1;
+                photoStable--;
 
-                picturename = "/home/pi/Pictures/tracker_" + getDateAndTime() + ".jpg";
+                picturename = "/media/pi/INTENSO/Pictures/tracker_" + getDateAndTime() + "_" + to_string(-photoStable) + ".jpg";
                 cout << "saving picture: " << picturename << endl;
                 imwrite( picturename, imageshot );
                 cout.flush();
                 //resize(imageout, imageshot, cv::Size(), 0.25, 0.25);
             }
             else
-            if( photoStable == -1 )
+            if( photoStable <= -10 )
             {   
                 cout << "Picture: false" << endl;
                 cameraState = 0;
@@ -470,27 +490,32 @@ void Camera::sendFocus()
 
 void Camera::calcFocus()
 {
+    Mat dst;
     cvtColor(imageout(roi), imagefocus, CV_RGB2GRAY);
     
-    Mat imageSobel;
-    Sobel(imagefocus, imageSobel, CV_16U, 1, 1);
-    //Sobel(imagefocus, imageSobel, CV_16U, 1, 0);
+    Laplacian(imagefocus, dst, CV_64F);
+
+    Scalar mu, sigma;
+    meanStdDev(dst, mu, sigma);
+
+    double meanFocusLoc = sigma.val[0] * sigma.val[0];
     
-    double meanFocusLoc = mean(imageSobel)[0];
-    if( enAutoFocus == false )
-    {
-        if( meanFocus < meanFocusLoc )
-        {
-            meanFocus = meanFocusLoc;
-        }
-    }
-    else
-    {
-        meanFocus = meanFocusLoc;
-    }
-        
-    line(imagetrack(zoom), Point(focusPos,focusPos), Point(focusPos+(meanFocus*focusLineLength),focusPos), 
-         focusColor, 5*drawScale, LINE_8);
+    //Mat imageSobel;
+    //Sobel(imagefocus, imageSobel, CV_16U, 1, 1);
+    //double meanFocusLoc = mean(imageSobel)[0];
+    
+    meanFocus = meanFocus + (0.3 * (meanFocusLoc - meanFocus)); //0.09 0.3
+    
+/*
+    osci1.erase( osci1.begin()+0 );
+    osci1.push_back( meanFocus );
+    cv::Mat image1;
+    plot1->render( image1);
+    cv::imshow( "Plot1", image1 );
+*/        
+    putText(imagetrack(zoom), to_string((int)meanFocus), Point(focusPos,focusPos), FONT_HERSHEY_SIMPLEX, 1*drawScale, focusColor, 2, LINE_AA);
+    //line(imagetrack(zoom), Point(focusPos,focusPos), Point(focusPos+(meanFocus*focusLineLength),focusPos), 
+    //     focusColor, 5*drawScale, LINE_8);
     
     return;
 }
@@ -568,7 +593,7 @@ int Camera::setControl( string prop )
         if( (pos = prop.rfind("Focusauto=false")) != string::npos )
         {
             cout << "Focus auto: off" << endl;
-            meanFocus = 0.0;
+            //meanFocus = 0.0;
             enAutoFocus = false;
             focusColor = Scalar(0,165,255);   
             procMsg->sendClientToServer("autooff");
@@ -577,28 +602,28 @@ int Camera::setControl( string prop )
         if( (pos = prop.rfind("Focusrun=left")) != string::npos )
         {
             cout << "Focus run: left" << endl;
-            meanFocus = 0.0;
+            //meanFocus = 0.0;
             procMsg->sendClientToServer("runleft");
         }   
         else
         if( (pos = prop.rfind("Focusrun=right")) != string::npos )
         {
             cout << "Focus run: right" << endl;
-            meanFocus = 0.0;
+            //meanFocus = 0.0;
             procMsg->sendClientToServer("runright");
         } 
         else
         if( (pos = prop.rfind("Focusstep=left")) != string::npos )
         {
             cout << "Focus step: left" << endl;
-            meanFocus = 0.0;
+            //meanFocus = 0.0;
             procMsg->sendClientToServer("stepleft");
         }   
         else
         if( (pos = prop.rfind("Focusstep=right")) != string::npos )
         {
             cout << "Focus step: right" << endl;
-            meanFocus = 0.0;
+            //meanFocus = 0.0;
             procMsg->sendClientToServer("stepright");
         }  
     }
@@ -658,7 +683,7 @@ int Camera::setControl( string prop )
             {
                 recordVideo = true;
                 string videoname;
-                videoname = "/home/pi/Videos/tracker_" + getDateAndTime() + ".avi";
+                videoname = "/media/pi/INTENSO/Videos/tracker_" + getDateAndTime() + ".avi";
                 cout << "Video name: " << videoname << endl;
                 if( writer == nullptr )
                 {
@@ -845,7 +870,8 @@ void Camera::changeZoom()
         zoom.x = (camProps.widthVideo - zoom.width) * 0.5;
         zoom.y = (camProps.heightVideo - zoom.height) * 0.5;         
     }
-    focusLineLength = 100.0 * drawScale / zoomFactor;
+    //focusLineLength = 100.0 * drawScale / zoomFactor;
+    focusLineLength = 5.0 * drawScale / zoomFactor;
 }
 
 string Camera::getDateAndTime()

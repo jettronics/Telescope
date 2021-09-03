@@ -85,6 +85,8 @@ private:
    Rect2d zoom;
    double zoomFactor;
    double focusLineLength;
+   //vector<double> osci1;
+   //Ptr<plot::Plot2d> plot1;
 };
 
 

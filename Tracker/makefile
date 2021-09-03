@@ -11,7 +11,7 @@ DEPS = camera.h tcpsocketcom.h focus.h position.h procmessage.h objectcontrol.h
 #Any special libraries you are using in your project (e.g. -lbcm2835 -lrt `pkg-config --libs gtk+-3.0` ), or leave blank
 #LIBS = -lrt -lraspicam -lraspicam_cv -lmmal -lmmal_core -lmmal_util -lopencv_core -lopencv_highgui 
 #LIBS = -lrt -lraspicam -lraspicam_cv -lopencv_core -lopencv_highgui 
-LIBS =  -lraspicam -lraspicam_cv -lopencv_core -lopencv_imgcodecs -lopencv_videoio -lopencv_highgui -lopencv_imgproc -lopencv_tracking /opt/vc/lib/libmmal_core.so /opt/vc/lib/libmmal_util.so /opt/vc/lib/libmmal.so -lrt 
+LIBS =  -lraspicam -lraspicam_cv -lopencv_core -lopencv_imgcodecs -lopencv_videoio -lopencv_highgui -lopencv_imgproc -lopencv_tracking -lopencv_plot /opt/vc/lib/libmmal_core.so /opt/vc/lib/libmmal_util.so /opt/vc/lib/libmmal.so -lrt 
 
 #Set any compiler flags you want to use (e.g. -I/usr/include/somefolder `pkg-config --cflags gtk+-3.0` ), or leave blank
 CFLAGS = -I/usr/local/include/ -L/usr/local/lib/
