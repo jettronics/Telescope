@@ -93,14 +93,17 @@ int main(int argc, char *argv[])
     {
         int exitCond;
         Position position;
-        ObjectControl objectcontrol(&position, &msgPosCam);
+        Position *posUsb = new PositionUsb;
+        ObjectControl objectcontrol(&position, posUsb, &msgPosCam);
         
         position.init();
+        posUsb->init();
         
         while( 1 )
         {
             exitCond = objectcontrol.processMsg();
             position.process();
+            posUsb->process();
             
             if( exitCond < 0 )
             {
@@ -110,6 +113,9 @@ int main(int argc, char *argv[])
         }
         
         position.deInit();
+        posUsb->deInit();
+        
+        delete posUsb;
         
         exit(0);        
     }

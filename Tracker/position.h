@@ -7,26 +7,22 @@ class Position
 {
    
 public:
-   
-   
-public:
    Position();
    virtual ~Position();
 
 public:
-   void init();
+   virtual void init();
    void deInit();
-   void process();
+   virtual void process();
    void setFixedAzm( int azm );
    void setFixedAlt( int alt );
    void setFixedRate( char rate ) { fixedRate = rate; }
+   char getFixedRate() { return fixedRate; }
    void setVariableAzm( int azm );
    void setVariableAlt( int alt );
    
-private:
+protected:
    int filestream;
-   //vector<string> strSend;
-   //vector<array<char, 8>> arrSend;
    char rxBuffer[1024];
    char arrBuf[8];
    char arrBufAlt[8];
@@ -45,5 +41,17 @@ private:
    int waitTurnAltCount;    
 };
 
+class PositionUsb : public Position
+{
+   
+public:
+   PositionUsb();
+   virtual ~PositionUsb();
+
+public:
+   void init();
+   void process();
+   
+};
 
 #endif

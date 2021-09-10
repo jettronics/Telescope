@@ -87,7 +87,7 @@ Camera::Camera()
 {
     objectControl = new ObjectControl;
 }
-
+/*
 Camera::Camera(TcpSocketCom *control, TcpSocketCom *stream, Focus *focus, Position *position)
     : writer(nullptr)
     , control(control)
@@ -149,6 +149,7 @@ Camera::Camera( TcpSocketCom *control, TcpSocketCom *stream, ProcMessage *proc, 
 {
     objectControl = new ObjectControl(position);
 }
+*/
 
 Camera::Camera( TcpSocketCom *control, TcpSocketCom *stream, ProcMessage *proc, ProcMessage *posmsg )
     : writer(nullptr)
@@ -527,6 +528,15 @@ int Camera::setControl( string prop )
 
     if( (pos = prop.rfind("Position")) != string::npos )
     {
+        if( (pos = prop.rfind("Positionsel=")) != string::npos )
+        {
+            string sub = prop.substr(pos+12);
+            cout << "Positionsel: " << (int)stoi(sub) << endl;
+            //position->setFixedRate( (char)stoi(sub) );
+            string strSend = "sel=" + sub;
+            posMsg->sendClientToServer(strSend);
+        } 
+        
         if( (pos = prop.rfind("Positionspeed=")) != string::npos )
         {
             string sub = prop.substr(pos+14);

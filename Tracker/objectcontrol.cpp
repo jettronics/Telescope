@@ -18,8 +18,9 @@ ObjectControl::ObjectControl()
 
 }
 
-ObjectControl::ObjectControl(Position *position)
+ObjectControl::ObjectControl(Position *position, Position *position2)
     : position(position)
+    , position2(position2)
     , ctrlPos(0,0)
     , Kp(0.2)//Kp(0.4) Kp(0.5)
     , Ti(0.005)//Ti(0.015) Ti(0.009)
@@ -31,9 +32,11 @@ ObjectControl::ObjectControl(Position *position)
     , arcsecondsSpeedLimitedOld(0,0)
     , initFlag(true)
     , trackFlag(false)
-    , arcsecondsSpeedPredict(0,0)
-    , arcsecondsSpeedPT1(0,0)
+    , arcsecondsSpeedPredict(15,0)
     , predictCalc(false)
+    , manualPos(false)
+    , manualPos2(false)    
+    , selector(0)
 {
     speedFieldOut[0] = 0;
     speedFieldOut[1] = 0;
@@ -47,8 +50,9 @@ ObjectControl::ObjectControl(Position *position)
     speedObj = Point2d(0,0);
 }
 
-ObjectControl::ObjectControl(Position *position, ProcMessage *proc)
+ObjectControl::ObjectControl(Position *position, Position *position2, ProcMessage *proc)
     : position(position)
+    , position2(position2)    
     , procMsg(proc)
     , ctrlPos(0,0)
     , Kp(0.2)//Kp(0.4) Kp(0.5)
@@ -62,8 +66,10 @@ ObjectControl::ObjectControl(Position *position, ProcMessage *proc)
     , initFlag(true)
     , trackFlag(false)
     , arcsecondsSpeedPredict(0,0)
-    , arcsecondsSpeedPT1(0,0)    
     , predictCalc(false)
+    , manualPos(false) 
+    , manualPos2(false)        
+    , selector(0)       
 {
     speedFieldOut[0] = 0;
     speedFieldOut[1] = 0;
@@ -99,9 +105,11 @@ void ObjectControl::init(double width, double height)
     inPosBuf.y = height * 0.5;
     cout << dec << "Init inPosBuf = " << inPosBuf << endl;
     
+    // Just for testing
+    //inPosArc = arcsecondPerPixel * inPosBuf;
+    
     arcsecondsSpeedLimitedOld = Point2i(0,0);
-    arcsecondsSpeedPredict = Point2i(0,0);
-    arcsecondsSpeedPT1 = Point2i(0,0);
+    arcsecondsSpeedPredict = Point2i(15,0);
     
     speedFieldOut[0] = 0;
     speedFieldOut[1] = 0;
@@ -122,6 +130,12 @@ void ObjectControl::deInit()
 void ObjectControl::process()
 {
     Point2d inPosArc = arcsecondPerPixel * inPosBuf;
+    // Just for testing
+    /*if( inPosArc.x < 2000 )
+    {
+        inPosArc.x += 3.75;
+    }*/
+
     //cout << dec << "inPosArc = " << inPosArc << "''" << endl;
     
     if( initFlag == true )
@@ -132,6 +146,8 @@ void ObjectControl::process()
         }
         initFlag = false;
     }
+    
+        
     Point2d uDiff = inPosArc - ctrlPos;
     //cout << "uDiff = " << uDiff << "''" << endl;
     
@@ -158,7 +174,7 @@ void ObjectControl::process()
     {
         uKi.y = -35.7;
     }
-    
+/*   
     if( (uDiff.x < 3.6) && (uDiff.x > -3.6) )
     {
         uKiOld.x = 0.0;
@@ -176,7 +192,7 @@ void ObjectControl::process()
     {
         uKiOld.y = uKi.y;
     }
-            
+*/            
     for( int i=0; i<7; i++ )
     {
         deltaInPos[7-i] = deltaInPos[6-i];
@@ -200,10 +216,11 @@ void ObjectControl::process()
     //cout << "uDiff = " << uDiff << "''" << endl;
     if( predictCalc == false )
     {
-        Point2i arcsecondsSpeedTemp;
-        arcsecondsSpeedTemp.x = arcsecondsSpeedPredict.x + (0.02 * (arcsecondsSpeedLimited.x - arcsecondsSpeedPredict.x));
-        arcsecondsSpeedTemp.y = arcsecondsSpeedPredict.y + (0.02 * (arcsecondsSpeedLimited.y - arcsecondsSpeedPredict.y));
-        arcsecondsSpeedPredict = arcsecondsSpeedTemp;
+        Point2d arcsecondsSpeedTemp;
+        arcsecondsSpeedTemp.x = arcsecondsSpeedPredict.x + (0.01 * ((double)arcsecondsSpeedLimited.x - arcsecondsSpeedPredict.x));
+        arcsecondsSpeedTemp.y = arcsecondsSpeedPredict.y + (0.01 * ((double)arcsecondsSpeedLimited.y - arcsecondsSpeedPredict.y));
+        arcsecondsSpeedPredict.x = arcsecondsSpeedTemp.x;
+        arcsecondsSpeedPredict.y = arcsecondsSpeedTemp.y;
         //cout << "Mean arcsecLim/s = " << arcsecondsSpeedPredict << "''/s" << endl;
         //cout << "Act  arcsecLim/s = " << arcsecondsSpeedLimited << "''/s" << endl;
     }
@@ -213,16 +230,18 @@ void ObjectControl::process()
         //cout << "Predict arcsecLim/s = " << arcsecondsSpeedLimited << "''/s" << endl;
     }
     
-    //if( arcsecondsSpeedLimitedOld.x != arcsecondsSpeedLimited.x )
+    if( manualPos == false )
     {
         position->setVariableAzm(arcsecondsSpeedLimited.x);
         //cout << dec << "arcsecLim/s = " << arcsecondsSpeedLimited << "''/s" << endl;
-    }
-    
-    //if( arcsecondsSpeedLimitedOld.y != arcsecondsSpeedLimited.y )
-    {
         position->setVariableAlt(arcsecondsSpeedLimited.y);
         //cout << dec << "arcsecLim/s = " << arcsecondsSpeedLimited << "''/s" << endl;
+    }
+    
+    if( manualPos2 == false )
+    {   
+        position2->setVariableAzm(arcsecondsSpeedLimited.x);
+        position2->setVariableAlt(arcsecondsSpeedLimited.y); 
     }
         
     //arcsecondsSpeedLimitedOld = arcsecondsSpeedLimited;
@@ -295,52 +314,134 @@ int ObjectControl::processMsg()
                 }
             }
         }
+        
+        if( (pos = rec.rfind("sel=")) != string::npos )
+        {
+            string sub = rec.substr(pos+4);
+            cout << "sel: " << (int)stoi(sub) << endl;
+            selector = (int)stoi(sub);
+        }
         else
         if( (pos = rec.rfind("rate=")) != string::npos )
         {
             string sub = rec.substr(pos+5);
             cout << "rate: " << (int)stoi(sub) << endl;
-            position->setFixedRate( (char)stoi(sub) );
+            if( selector == 0 )
+            {
+                position->setFixedRate( (char)stoi(sub) );
+            }
+            else
+            {
+                position2->setFixedRate( (char)stoi(sub) );
+            }
         }  
         else
         if( (pos = rec.rfind("alt=1")) != string::npos )
         {
             cout << "alt=1" << endl;
-            position->setFixedAlt( 1 );
-            trackFlag = false;
+            //position->setFixedAlt( 1 );
+            if( selector == 0 )
+            {
+                position->setFixedAlt( position->getFixedRate() * 20 );
+                manualPos = true;
+                //trackFlag = false;
+            }
+            else
+            {
+                position2->setFixedAlt( position->getFixedRate() * 20 );
+                manualPos2 = true;
+                //trackFlag = false;
+            }
         }  
         else
         if( (pos = rec.rfind("alt=-1")) != string::npos )
         {
             cout << "alt=-1" << endl;
-            position->setFixedAlt( -1 );
-            trackFlag = false;
+            //position->setFixedAlt( -1 );
+            if( selector == 0 )
+            {
+                position->setFixedAlt( position->getFixedRate() * (-20) );
+                manualPos = true;
+                //trackFlag = false;
+            }
+            else
+            {
+                position2->setFixedAlt( position->getFixedRate() * (-20) );
+                manualPos2 = true;
+                //trackFlag = false;
+            }            
         }  
         else
         if( (pos = rec.rfind("azm=-1")) != string::npos )
         {
             cout << "azm=-1" << endl;
-            position->setFixedAzm( -1 );
-            trackFlag = false;
+            //position->setFixedAzm( -1 );
+            if( selector == 0 )
+            {
+                position->setFixedAzm( position->getFixedRate() * (-20) ); 
+                manualPos = true;
+                //trackFlag = false;
+            }
+            else
+            {
+                position2->setFixedAzm( position->getFixedRate() * (-20) ); 
+                manualPos2 = true;
+                //trackFlag = false;
+            }            
         }  
         else
         if( (pos = rec.rfind("azm=1")) != string::npos )
         {
             cout << "azm=1" << endl;
-            position->setFixedAzm( 1 );
-            trackFlag = false;
+            //position->setFixedAzm( 1 );
+            if( selector == 0 )
+            {
+                position->setFixedAzm( position->getFixedRate() * 20 );   
+                manualPos = true;
+                //trackFlag = false;
+            }
+            else
+            {
+                position2->setFixedAzm( position->getFixedRate() * 20 );  
+                manualPos2 = true;
+                //trackFlag = false;
+            }             
         }  
         else
         if( (pos = rec.rfind("alt=0")) != string::npos )
         {
             cout << "alt=0" << endl;
-            position->setFixedAlt( 0 );
+            //position->setFixedAlt( 0 );
+            if( selector == 0 )
+            {
+                position->setFixedAlt( 0 );   
+                manualPos = false;
+                //trackFlag = false;
+            }
+            else
+            {
+                position2->setFixedAlt( 0 ); 
+                manualPos2 = false;
+                //trackFlag = false;
+            }   
         }  
         else
         if( (pos = rec.rfind("azm=0")) != string::npos )
         {
             cout << "azm=0" << endl;
-            position->setFixedAzm( 0 );
+            //position->setFixedAzm( 0 );
+            if( selector == 0 )
+            {
+                position->setFixedAzm( 0 );   
+                manualPos = false;
+                //trackFlag = false;
+            }
+            else
+            {
+                position2->setFixedAzm( 0 ); 
+                manualPos2 = false;
+                //trackFlag = false;
+            }              
         }  
         else
         if( (pos = rec.find("exit")) != string::npos )

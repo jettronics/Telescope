@@ -9,8 +9,8 @@ class ObjectControl
    
 public:
    ObjectControl();
-   ObjectControl(Position *position);
-   ObjectControl(Position *position, ProcMessage *proc);
+   ObjectControl(Position *position, Position *position2);
+   ObjectControl(Position *position, Position *position2, ProcMessage *proc);
    virtual ~ObjectControl();
 
 public:
@@ -26,6 +26,7 @@ private:
    
 private:
    Position *position;
+   Position *position2;
    ProcMessage *procMsg;
    Point2d ctrlPos;
    double Kp, Ti, Td;
@@ -40,9 +41,11 @@ private:
    bool trackFlag;
    Point2d inPosBuf;
    Point2d speedObj;
-   Point2i arcsecondsSpeedPredict;
-   Point2i arcsecondsSpeedPT1;   
+   Point2d arcsecondsSpeedPredict;
    bool predictCalc;
+   bool manualPos;
+   bool manualPos2;   
+   int selector;
 };
 
 

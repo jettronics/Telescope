@@ -32,8 +32,8 @@ class Camera
 {
 public:
    Camera();
-   Camera( TcpSocketCom *control, TcpSocketCom *stream, Focus *focus, Position *position );
-   Camera( TcpSocketCom *control, TcpSocketCom *stream, ProcMessage *proc, Position *position );
+   //Camera( TcpSocketCom *control, TcpSocketCom *stream, Focus *focus, Position *position );
+   //Camera( TcpSocketCom *control, TcpSocketCom *stream, ProcMessage *proc, Position *position );
    Camera( TcpSocketCom *control, TcpSocketCom *stream, ProcMessage *proc, ProcMessage *posmsg );
    virtual ~Camera(); 
 

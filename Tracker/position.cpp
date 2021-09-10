@@ -53,9 +53,16 @@ Position::Position()
 
 Position::~Position()
 {
-
 }
 
+PositionUsb::PositionUsb()
+    : Position()
+{
+}
+
+PositionUsb::~PositionUsb()
+{
+}
 
 void Position::init()
 {
@@ -74,21 +81,59 @@ void Position::init()
     cfsetispeed(&options, B9600);
     cfsetospeed(&options, B9600);
     
-    /*options.c_cflag |=  (CLOCAL | CREAD); 
     options.c_cflag &=  ~CSIZE; 
     options.c_cflag &=  ~CSTOPB; 
     options.c_cflag &=  ~PARENB; 
-    options.c_cflag |=  CS8; */
-    
-    options.c_cflag &=  ~CSIZE; 
-    options.c_cflag &=  ~CSTOPB; 
-    options.c_cflag &=  ~PARENB; 
+    options.c_cflag &=  ~CRTSCTS;
     options.c_cflag |=  CS8; 
     options.c_cflag |=  (CLOCAL | CREAD);  
     
     options.c_lflag &= ~(ICANON | ECHO | ECHOE | ISIG);
-    options.c_iflag = IGNPAR;           /* Parity-Fehler ignorieren */
+    //options.c_iflag = IGNPAR;           /* Parity-Fehler ignorieren */
+    options.c_iflag &= ~(IXON | IXOFF | IXANY);
+    options.c_iflag &= ~(IGNBRK|BRKINT|PARMRK|ISTRIP|INLCR|IGNCR|ICRNL);
     options.c_oflag &= ~OPOST;          /* setze "raw" Input */
+    options.c_oflag &= ~ONLCR;
+    options.c_cc[VMIN]  = 0;            /* warten auf min. 0 Zeichen */
+    options.c_cc[VTIME] = 0;            /* Timeout */
+    tcflush(filestream,TCIOFLUSH);              /* Puffer leeren */  
+    tcsetattr(filestream, TCSAFLUSH, &options);     
+    
+    //tcsetattr(filestream, TCSANOW, &options);
+    
+    return;
+}
+
+void PositionUsb::init()
+{
+    cout << "Position usb init" << endl;
+    
+    //arrSend.clear();
+    
+    filestream = open("/dev/ttyUSB0", O_RDWR | O_NOCTTY | O_NDELAY);
+    if (filestream == -1) 
+    {
+        cout << "UART open error" << endl;
+    }
+
+    struct termios options;
+    tcgetattr(filestream, &options);
+    cfsetispeed(&options, B9600);
+    cfsetospeed(&options, B9600);
+    
+    options.c_cflag &=  ~CSIZE; 
+    options.c_cflag &=  ~CSTOPB; 
+    options.c_cflag &=  ~PARENB; 
+    options.c_cflag &=  ~CRTSCTS;
+    options.c_cflag |=  CS8; 
+    options.c_cflag |=  (CLOCAL | CREAD);  
+    
+    options.c_lflag &= ~(ICANON | ECHO | ECHOE | ISIG);
+    //options.c_iflag = IGNPAR;           /* Parity-Fehler ignorieren */
+    options.c_iflag &= ~(IXON | IXOFF | IXANY);
+    options.c_iflag &= ~(IGNBRK|BRKINT|PARMRK|ISTRIP|INLCR|IGNCR|ICRNL);
+    options.c_oflag &= ~OPOST;          /* setze "raw" Input */
+    options.c_oflag &= ~ONLCR;
     options.c_cc[VMIN]  = 0;            /* warten auf min. 0 Zeichen */
     options.c_cc[VTIME] = 0;            /* Timeout */
     tcflush(filestream,TCIOFLUSH);              /* Puffer leeren */  
@@ -110,75 +155,112 @@ void Position::deInit()
 
 void Position::setFixedAzm( int azm )
 {
-    //array<char, 8> chrRate; 
+    char rh = 0, rl = 0;
     
     arrBufAzm[0] = (char)'P';
-    arrBufAzm[1] = (char)2;
+    //arrBufAzm[1] = (char)2;
+    arrBufAzm[1] = (char)3;
     arrBufAzm[2] = (char)16;
     if( azm > 0 )
     {
-        arrBufAzm[3] = (char)36;
-        arrBufAzm[4] = (char)fixedRate;
+        //arrBufAzm[3] = (char)36;
+        //arrBufAzm[4] = (char)fixedRate;
+        rh = (char)(azm >> 6);
+        rl = (char)((azm << 2) % 256);
+        arrBufAzm[3] = (char)6;
+        arrBufAzm[4] = (char)rh;
+        arrBufAzm[5] = (char)rl;        
     }
     else
     if( azm < 0 )
     {
-        arrBufAzm[3] = (char)37;
-        arrBufAzm[4] = (char)fixedRate;
+        //arrBufAzm[3] = (char)37;
+        //arrBufAzm[4] = (char)fixedRate;
+        int azmpos = -azm;
+        rh = (char)(azmpos >> 6);
+        rl = (char)((azmpos << 2) % 256);
+        arrBufAzm[3] = (char)7;
+        arrBufAzm[4] = (char)rh;
+        arrBufAzm[5] = (char)rl;        
     }
     else
     {
-        arrBufAzm[3] = lastDirFixAzm;
+        //arrBufAzm[3] = lastDirFixAzm;
+        //arrBufAzm[4] = (char)0;
+        arrBufAzm[3] = lastDirVarAzm;
         arrBufAzm[4] = (char)0;
+        arrBufAzm[5] = (char)0;
     }
+/*
     arrBufAzm[5] = (char)0;
     arrBufAzm[6] = (char)0;
     arrBufAzm[7] = (char)0;
         
-    //arrSend.push_back(chrRate);
-    
     lastDirFixAzm = arrBufAzm[3];
-    
+*/    
+    arrBufAzm[6] = (char)0;
+    arrBufAzm[7] = (char)0;
+        
+    lastDirVarAzm = arrBufAzm[3];
+        
     return;
 }
 
 void Position::setFixedAlt( int alt )
 {
-    //array<char, 8> chrRate; 
+    char rh = 0, rl = 0;   
     
     arrBufAlt[0] = (char)'P';
-    arrBufAlt[1] = (char)2;
+    //arrBufAlt[1] = (char)2;
+    arrBufAlt[1] = (char)3;
     arrBufAlt[2] = (char)17;
     if( alt > 0 )
     {
-        arrBufAlt[3] = (char)36;
-        arrBufAlt[4] = (char)fixedRate;
+        //arrBufAlt[3] = (char)36;
+        //arrBufAlt[4] = (char)fixedRate;
+        rh = (char)(alt >> 6);
+        rl = (char)((alt << 2) % 256);
+        arrBufAlt[3] = (char)6;
+        arrBufAlt[4] = (char)rh;
+        arrBufAlt[5] = (char)rl;        
     }
     else
     if( alt < 0 )
     {
-        arrBufAlt[3] = (char)37;
-        arrBufAlt[4] = (char)fixedRate;
+        //arrBufAlt[3] = (char)37;
+        //arrBufAlt[4] = (char)fixedRate;
+        int altpos = -alt;
+        rh = (char)(altpos >> 6);
+        rl = (char)((altpos << 2) % 256);
+        arrBufAlt[3] = (char)7;
+        arrBufAlt[4] = (char)rh;
+        arrBufAlt[5] = (char)rl;        
     }
     else
     {
-        arrBufAlt[3] = lastDirFixAlt;
+        //arrBufAlt[3] = lastDirFixAlt;
+        //arrBufAlt[4] = (char)0;
+        arrBufAlt[3] = lastDirVarAlt;
         arrBufAlt[4] = (char)0;
+        arrBufAlt[5] = (char)0;        
     }
+/*    
     arrBufAlt[5] = (char)0;
     arrBufAlt[6] = (char)0;
     arrBufAlt[7] = (char)0;
         
-    //arrSend.push_back(chrRate);
-    
     lastDirFixAlt = arrBufAlt[3];
+*/    
+    arrBufAlt[6] = (char)0;
+    arrBufAlt[7] = (char)0;
+        
+    lastDirVarAlt = arrBufAlt[3];
     
     return;
 }
 
 void Position::setVariableAzm( int azm )
 {
-    //array<char, 8> chrRate; 
     char rh = 0, rl = 0;
     if( ((lastDirVarAzm == 6) && (azm < 0)) && (waitTurnAzm == false) )
     {
@@ -240,8 +322,6 @@ void Position::setVariableAzm( int azm )
     arrBufAzm[6] = (char)0;
     arrBufAzm[7] = (char)0;
         
-    //arrSend.push_back(chrRate);
-    
     lastDirVarAzm = arrBufAzm[3];
    
     return;
@@ -249,7 +329,6 @@ void Position::setVariableAzm( int azm )
 
 void Position::setVariableAlt( int alt )
 {
-    //array<char, 8> chrRate; 
     char rh = 0, rl = 0;   
     if( ((lastDirVarAlt == 6) && (alt < 0)) && (waitTurnAlt == false) )
     {
@@ -311,8 +390,6 @@ void Position::setVariableAlt( int alt )
     arrBufAlt[6] = (char)0;
     arrBufAlt[7] = (char)0;
         
-    //arrSend.push_back(chrRate);
-    
     lastDirVarAlt = arrBufAlt[3];
 
     return;    
@@ -322,47 +399,49 @@ void Position::process()
 {
     if( filestream != -1 )
     {
-        //if( arrSend.size() > 0 )
+        if( (msgReceived == true) && (waitReceived >= 2) )
         {
-            if( (msgReceived == true) && (waitReceived >= 2) )
+            //cout << "Position send:";
+            if( sendAzm == false )
             {
-                //cout << "Position send:";
-                if( sendAzm == false )
+                sendAzm = true;
+                for( int i=0; i < 8; i++ )
                 {
-                    sendAzm = true;
-                    for( int i=0; i < 8; i++ )
+                    arrBuf[i] = arrBufAzm[i];
+                    /*cout << hex << " " << (int)arrBuf[i];
+                    if( i == 7 )
                     {
-                        //arrBuf[i] = arrSend.at(0)[i];
-                        arrBuf[i] = arrBufAzm[i];
-                        //cout << hex << " " << (int)arrBuf[i];
-                    }
+                        cout << endl;
+                    }*/
                 }
-                else
-                {
-                    sendAzm = false;
-                    for( int i=0; i < 8; i++ )
-                    {
-                        //arrBuf[i] = arrSend.at(0)[i];
-                        arrBuf[i] = arrBufAlt[i];
-                        //cout << hex << " " << (int)arrBuf[i];
-                    }
-                }
-                //cout << endl;
-                //cout.flush();
-                int rettx = write(filestream, arrBuf, 8);
-                //arrSend.erase(arrSend.begin()+0);
-                if (rettx < 0) 
-                {
-                    cout << "UART TX error" << endl;
-                }
-                else
-                {
-                    msgReceived = false;
-                }
-                //cout.flush();
             }
+            else
+            {
+                sendAzm = false;
+                for( int i=0; i < 8; i++ )
+                {
+                    arrBuf[i] = arrBufAlt[i];
+                    /*cout << hex << " " << (int)arrBuf[i];
+                    if( i == 7 )
+                    {
+                        cout << endl;
+                    }*/
+                }
+            }
+            //cout << endl;
+            //cout.flush();
+            int rettx = write(filestream, arrBuf, 8);
+            if (rettx < 0) 
+            {
+                cout << "UART TX error" << endl;
+            }
+            else
+            {
+                msgReceived = false;
+            }
+            //cout.flush();
         }
-//#if 0                
+
         int retrx = read(filestream, rxBuffer, 1000);
 
         if( retrx < 0 ) 
@@ -376,12 +455,15 @@ void Position::process()
         {
             rxBuffer[retrx] = '\0';
             //string rxRead = rxBuffer;
-            //cout << "UART RX length: " << retrx << endl;
             //cout << "UART RX data: " << rxRead << endl;
             //cout << dec << "UART RX length: " << retrx << endl;
             /*for( int i=0; i < retrx; i++ )
             {
                 cout << hex << " 0x" << (int)rxBuffer[i];
+                if( i == retrx-1 )
+                {
+                    cout << endl;
+                }
             }*/
 
             if( retrx > 0 )
@@ -411,5 +493,71 @@ void Position::process()
     return;
 }
 
+void PositionUsb::process()
+{
+    if( filestream != -1 )
+    {
+        if( (msgReceived == true) && (waitReceived >= 2) )
+        {
+            waitReceived = 0;
+            //cout << "Position usb send:";
+            if( sendAzm == false )
+            {
+                sendAzm = true;
+                for( int i=0; i < 8; i++ )
+                {
+                    arrBuf[i] = arrBufAzm[i];
+                    /*cout << hex << " " << (int)arrBuf[i];
+                    if( i == 7 )
+                    {
+                        cout << endl;
+                    }*/
+                }
+            }
+            else
+            {
+                sendAzm = false;
+                for( int i=0; i < 8; i++ )
+                {
+                    arrBuf[i] = arrBufAlt[i];
+                    /*cout << hex << " " << (int)arrBuf[i];
+                    if( i == 7 )
+                    {
+                        cout << endl;
+                    }*/
+                }
+            }
+            //cout << endl;
+            //cout.flush();
+            int rettx = write(filestream, arrBuf, 8);
+            if (rettx < 0) 
+            {
+                cout << "UART usb TX error" << endl;
+            }
+            else
+            {
+                msgReceived = false;
+            }
+            //cout.flush();
+        }
 
+//#if 0                
+        msgReceived = true;
+
+        if( msgReceived == true )
+        {
+            waitReceived++;
+        }
+        if( waitTurnAzm == true )
+        {
+            waitTurnAzmCount++;
+        }
+        if( waitTurnAlt == true )
+        {
+            waitTurnAltCount++;
+        }
+//#endif        
+    }
+    return;
+}
 
