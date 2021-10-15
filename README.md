@@ -5,7 +5,7 @@
 <!-- Why the project is useful -->
 The Telescope project has been introduced to track astronomy objects e.g. moon, planets, etc. and to watch them by mobile device like smart phone or tablet without adjusting the object position through the Telescope manually. There is the possibility to take object image snap shots and recording video stream of the object. But based on the Altitude-Azimuth-mounting it is not suitable for longer exposure times since the object will rotate during that time. Better would be an equatorial mount for this.  
 
-Another purpose is to use the Tracker application running on one Telescope and control another Telescope as a slave to follow the master Telescope. The slave Telescope can then be used to watch the astronomy objects by eyes through the Telescope optics without using Star alignment.
+Another purpose is to use the Tracker application running on one Telescope and control another Telescope as a slave to follow the master Telescope. The slave Telescope can then be used to watch the astronomy objects without adjusting the object position manually and without using Star alignment.
 
 The Telescope NexStar 4 will be used as master and NexStar 8 SE will be used as slave.
 
