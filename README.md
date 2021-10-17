@@ -12,7 +12,7 @@ The Telescope NexStar 4 will be used as master and NexStar 8 SE will be used as 
 ## Electrical setup and wiring
 ### Telescope power
 There is the possibility to connect external 12V Power sources instead of using battery compartment of the Telescope.
-The connector is shown below:
+The connector is shown below:  
 ![Telescope Power](/Images/TelescopePower.jpg)  
 The inner diameter of the plug is 2.1mm.
 ### NexStar Telescope data interface
@@ -39,7 +39,7 @@ desired tracking rate is 150 arcseconds/second, then:
 ### Optical focus motor
 ### Tracking Camera 
 ### Main controller
-
+![Telescope Wiring](/Images/TelescopeWiring.jpg)
 ## Software function description
 ### Remote Control application
 #### Node-RED flow overview
