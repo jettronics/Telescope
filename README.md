@@ -38,6 +38,15 @@ desired tracking rate is 150 arcseconds/second, then:
 | Variable rate Alt (or Dec) slew in negative direction | 'P', 3, 17, 7, trackRateHigh, trackRateLow, 0, 0 | '#' |
 ### Optical focus motor
 ### Tracking Camera 
+For tracking and taking images the Raspberry PI HQ camera is used. Following an abstraction of data sheet
+* Sony IMX477R Sensor
+* 7.9mm Sensor diagonal
+* Pixelsize 1.55µm x 1.55µm
+* Integrated IR cut filter with following Transmission curve:
+![IR Filter Transmission](/Images/IRFilterTransmission.png)  
+Astronomy imaging requests a IR cut filter with passing wavelengths from 400nm to 700nm with a transmission of 97...99% to block IR light which causes halos around all objects.
+For tracking the integrated IR cut filter is fine enough.
+* sfdfs
 ### Main controller
 ![Telescope Wiring](/Images/TelescopeWiring.jpg)
 ## Software function description
