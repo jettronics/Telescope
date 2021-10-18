@@ -46,9 +46,10 @@ For tracking and taking images the Raspberry PI HQ camera is used. Following an 
 ![IR Filter Transmission](/Images/IRFilterTransmission.png)  
 Astronomy imaging requests a IR cut filter with passing wavelengths from 400nm to 700nm with a transmission of 97...99% to block IR light which causes halos around all objects.
 For tracking the integrated IR cut filter is fine enough.
-* sfdfs
 ### Main controller
-![Telescope Wiring](/Images/TelescopeWiring.jpg)
+The controller used here for the Telescope is a Raspberry PI 3B+. The wiring overview is shown below.
+![Telescope Wiring](/Images/TelescopeWiring.jpg)  
+The camera is connected through the Raspberry's Camera port. Slewing commands will be send over RS232 interface with Voltage converter for older Telescopes. For newer Telescopes the communication is realized by USB connection. Focus motor driver works with 3.3V driven by RPi directly. To control the motor speed PWM Pins will be used. 
 ## Software function description
 ### Remote Control application
 #### Node-RED flow overview
