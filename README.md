@@ -50,6 +50,13 @@ For tracking the integrated IR cut filter is fine enough.
 The controller used here for the Telescope is a Raspberry PI 3B+. The wiring overview is shown below.
 ![Telescope Wiring](/Images/TelescopeWiring.jpg)  
 The camera is connected through the Raspberry's Camera port. Slewing commands will be send over RS232 interface with Voltage converter for older Telescopes. For newer Telescopes the communication is realized by USB connection. Focus motor driver works with 3.3V driven by RPi directly. To control the motor speed PWM Pins will be used. 
+## Operation
+The Telescope tracker can be controlled by any web browser calling http://RPi-hostname:1880/ui. As followed the tracker tabs will be explained in more detail.
+### Tracker
+### Display
+### Position
+### Focus
+### Properties
 ## Software function description
 ### Remote Control application
 #### Node-RED flow overview
@@ -60,12 +67,5 @@ The camera is connected through the Raspberry's Camera port. Slewing commands wi
 #### Focus
 1. Manual focus
 2. Autofocus
-
-## Operation
-### Tracker
-### Focus
-### Camera
-### ...
-
 
 
