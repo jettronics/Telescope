@@ -37,6 +37,11 @@ desired tracking rate is 150 arcseconds/second, then:
 | Variable rate Alt (or Dec) slew in positive direction | 'P', 3, 17, 6, trackRateHigh, trackRateLow, 0, 0 | '#' | 
 | Variable rate Alt (or Dec) slew in negative direction | 'P', 3, 17, 7, trackRateHigh, trackRateLow, 0, 0 | '#' |
 ### Optical focus motor
+Manually focusing by hand causes wiggle in the observing object. To avoid this a small motor is mounted on the Telescope focus.
+
+![Focus Motor](/Images/FocusMotor.jpg)  
+  
+Motor will be controlled by SW. It can be distuinguished between Auto Focus and Manual Focus. 
 ### Tracking Camera 
 For tracking and taking images the Raspberry PI HQ camera is used. Following an abstraction of data sheet
 * Sony IMX477R Sensor
