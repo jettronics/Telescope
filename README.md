@@ -58,10 +58,15 @@ The camera is connected through the Raspberry's Camera port. Slewing commands wi
 ## Operation
 The Telescope tracker can be controlled by any web browser calling http://RPi-hostname:1880/ui. As followed the tracker tabs will be explained in more detail.
 ### Tracker
+![Tracker Screen Shot](/Images/TrackerScreenShot.jpg)
 ### Display
+![Display Screen Shot](/Images/DisplayScreenShot.jpg)
 ### Position
+![Position Screen Shot](/Images/PositionScreenShot.jpg)
 ### Focus
+![Focus Screen Shot](/Images/FocusScreenShot.jpg)
 ### Properties
+![Properties Screen Shot](/Images/PropertiesScreenShot.jpg)
 ## Software function description
 ### Remote Control application
 #### Node-RED flow overview
