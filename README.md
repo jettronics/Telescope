@@ -56,9 +56,14 @@ The controller used here for the Telescope is a Raspberry PI 3B+. The wiring ove
 ![Telescope Wiring](/Images/TelescopeWiring.jpg)  
 The camera is connected through the Raspberry's Camera port. Slewing commands will be send over RS232 interface with Voltage converter for older Telescopes. For newer Telescopes the communication is realized by USB connection. Focus motor driver works with 3.3V driven by RPi directly. To control the motor speed PWM Pins will be used. 
 ## Operation
-The Telescope tracker can be controlled by any web browser calling http://RPi-hostname:1880/ui. As followed the tracker tabs will be explained in more detail.
+The Telescope tracker can be controlled by any web browser calling http://RPi-hostname:1880/ui. As following showed the tracker tabs will be explained in more detail.
 ### Tracker
-![Tracker Screen Shot](/Images/TrackerScreenShot.jpg)
+This tab controls starting, finishing the application and shutdowns the controller.  
+  
+![Tracker Screen Shot](/Images/TrackerScreenShot.jpg)  
+- Green button: Starts the application
+- Orange button: Finishes the application
+- Red button: Controller Shutdown 
 ### Display
 ![Display Screen Shot](/Images/DisplayScreenShot.jpg)
 ### Position
