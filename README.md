@@ -65,7 +65,16 @@ This tab controls starting, finishing the application and shutdowns the controll
 - Orange button: Finishes the application
 - Red button: Controller Shutdown 
 ### Display
-![Display Screen Shot](/Images/DisplayScreenShot.jpg)
+In this tab all relevant Display functions are collected. 
+
+![Display Screen Shot](/Images/DisplayScreenShot.jpg)  
+- Camera stream (Main area)
+- Camera stream zoom (Slider)
+- Switch between Camera stream over http or over Rasbperry HDMI port (Monitor)
+- Taking pictures or recording stream (Camera and Video symbol)
+- Show/Hide ROI (Region Of Interest) for tracking (Square)
+- Track object (Arrow)
+- Follow object by Telescope slewing (Circle with Dot)
 ### Position
 ![Position Screen Shot](/Images/PositionScreenShot.jpg)
 ### Focus
