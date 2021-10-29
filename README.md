@@ -102,7 +102,10 @@ With Properties tab the camera properties as followed can be set:
 - Frames Per Second (FPS)
 - Resolution
 ## Software function description
+The description is divided in a Server or Remote Control part implemented by Node-RED and in a Main Control application part implemented in C++. Both parts are deployed on a Raspberry PI 3B+ Controller board as shown above.
 ### Remote Control application
+Node-RED is a programming tool for wiring together hardware devices, APIs and online services in new and interesting ways.
+It provides a browser-based editor that makes it easy to wire together flows using the wide range of nodes in the palette that can be deployed to its runtime in a single-click.
 #### Node-RED flow overview
 ![Node Red Overview](/Images/NodeRedOverview.jpg)
 #### Major flow nodes
