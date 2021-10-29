@@ -91,7 +91,16 @@ The Focus tab is used to focus the object shown in camera stream.
 - The button with opposite arrows is the auto focus. Here it is important to focus the object by manual control buttons above as good as possible.
 To fine tune focus automatically press this button.
 ### Properties
-![Properties Screen Shot](/Images/PropertiesScreenShot.jpg)
+With Properties tab the camera properties as followed can be set:
+
+![Properties Screen Shot](/Images/PropertiesScreenShot.jpg)  
+- Brightness
+- Contrast
+- Saturation
+- Gain
+- Exposure
+- Frames Per Second (FPS)
+- Resolution
 ## Software function description
 ### Remote Control application
 #### Node-RED flow overview
