@@ -142,6 +142,15 @@ else
 }
 return msg;
 ```
+##### Display stream
+```html
+<img width="1280" height="960" src="data:image/jpg;base64,{{msg.payload}}"></img>
+```
+##### Payload Merger
+```java
+msg.payload = msg.topic + "=" + msg.payload + ";";
+return msg;
+```
 ### Main Control application
 #### Tracking
 #### Object Control
