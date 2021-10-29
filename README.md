@@ -75,12 +75,13 @@ In this tab all relevant Display functions are collected.
 - Show/Hide ROI (Region Of Interest) for tracking (Square)
 - Track object (Arrow)
 - Follow object by Telescope slewing (Circle with Dot)
-### Slewing
+### Position
 With following tab the Telescope can be slewed to the desired object position by the arrows in following tab.
 
 ![Position Screen Shot](/Images/PositionScreenShot.jpg)  
-With the squared icon buttons the slewing can be stopped.
-
+- With the squared icon buttons the slewing can be stopped
+- With the Speed slider the slewing rate can be set
+- With the selector the Telescope can be selected which needs to be slewed
 ### Focus
 ![Focus Screen Shot](/Images/FocusScreenShot.jpg)
 ### Properties
