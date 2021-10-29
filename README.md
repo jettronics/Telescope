@@ -107,8 +107,41 @@ The description is divided in a Server or Remote Control part implemented by Nod
 Node-RED is a programming tool for wiring together hardware devices, APIs and online services in new and interesting ways.
 It provides a browser-based editor that makes it easy to wire together flows using the wide range of nodes in the palette that can be deployed to its runtime in a single-click.
 #### Node-RED flow overview
-![Node Red Overview](/Images/NodeRedOverview.jpg)
+The following overview shows all nodes and their connections for the Remote Control application  
+
+![Node Red Overview](/Images/NodeRedOverview.jpg)  
+
 #### Major flow nodes
+Followed the nodes using a code block  
+
+##### Connected check
+As soon as a connection between Server application and Main Control application has been established the camera stream starts and all nodes containing a value will initialized.
+```java
+if (msg.status.text=="common.status.connected")
+{
+    msg.payload = "Connected";
+    msg.url = "http://localhost:52717";
+}
+else
+{
+    msg.payload = "Disconnected";
+    msg.stop = true;
+}
+return msg;
+```
+##### Init nodes
+The Init nodes initialize connected nodes with a certain value or string shown on "Init resolution" node:  
+```java
+if (msg.payload=="Connected")
+{
+    msg.payload = "640x480";
+}
+else
+{
+    msg.payload = "";
+}
+return msg;
+```
 ### Main Control application
 #### Tracking
 #### Object Control
