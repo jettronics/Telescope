@@ -83,7 +83,13 @@ With following tab the Telescope can be slewed to the desired object position by
 - With the Speed slider the slewing rate can be set
 - With the selector the Telescope can be selected which needs to be slewed
 ### Focus
-![Focus Screen Shot](/Images/FocusScreenShot.jpg)
+The Focus tab is used to focus the object shown in camera stream.
+
+![Focus Screen Shot](/Images/FocusScreenShot.jpg)  
+- Slow focus motor speed can be controlled by one arrow buttons manually
+- Fast focus motor speed can be controlled by two arrow buttons manually
+- The button with opposite arrows is the auto focus. Here it is important to focus the object by manual control buttons above as good as possible.
+To fine tune focus automatically press this button.
 ### Properties
 ![Properties Screen Shot](/Images/PropertiesScreenShot.jpg)
 ## Software function description
