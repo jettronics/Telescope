@@ -104,6 +104,7 @@ With Properties tab the camera properties as followed can be set:
 ## Software function description
 ### Remote Control application
 #### Node-RED flow overview
+![Node Red Overview](/Images/NodeRedOverview.jpg)
 #### Major flow nodes
 ### Main Control application
 #### Tracking
