@@ -23,19 +23,7 @@ The following picture shows the Pin wiring for RS232 port on Hand controller of 
 Note that there is a need of a RS232 voltage level shifter to communicate with an external PC.
 #### USB Interface to NexStar 8 SE
 The USB port can be used directly to communicate with external devices.
-#### Slewing commands
-The following commands allow you to slew (move) the telescope at variable rates.
-For variable rates, multiply the desired rate by 4 and then separate it into a high and low byte. For example if the
-desired tracking rate is 150 arcseconds/second, then:  
-* trackRateHigh = (150 * 4) \ 256 = 2, and  
-* trackRateLow = (150 * 4) mod 256 = 88 
 
-| Function | Command | Response | 
-| --- | --- | --- | 
-| Variable rate Azm (or RA) slew in positive direction | 'P', 3, 16, 6, trackRateHigh, trackRateLow, 0, 0 | '#' |
-| Variable rate Azm (or RA) slew in negative direction | 'P', 3, 16, 7, trackRateHigh, trackRateLow, 0, 0 | '#' |
-| Variable rate Alt (or Dec) slew in positive direction | 'P', 3, 17, 6, trackRateHigh, trackRateLow, 0, 0 | '#' | 
-| Variable rate Alt (or Dec) slew in negative direction | 'P', 3, 17, 7, trackRateHigh, trackRateLow, 0, 0 | '#' |
 ### Optical focus motor
 Manually focusing by hand causes wiggle in the observing object. To avoid this a small motor is mounted on the Telescope focus.
 
