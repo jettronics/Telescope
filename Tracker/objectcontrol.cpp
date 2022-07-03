@@ -11,6 +11,7 @@
 
 
 #define CONTROL_CYCLE_TIME 0.25
+#define CONTROL_FIXED_RATE 40
 
 
 ObjectControl::ObjectControl()
@@ -122,6 +123,8 @@ void ObjectControl::deInit()
     predictCalc = false;
     position->setVariableAzm( 0 );
     position->setVariableAlt( 0 );
+    position2->setVariableAzm( 0 );
+    position2->setVariableAlt( 0 );
     //position->setFixedAzm( 0 );
     //position->setFixedAlt( 0 );
 }
@@ -317,13 +320,13 @@ int ObjectControl::processMsg()
             //position->setFixedAlt( 1 );
             if( selector == 0 )
             {
-                position->setFixedAlt( position->getFixedRate() * 20 );
+                position->setFixedAlt( (int)position->getFixedRate() * CONTROL_FIXED_RATE );
                 manualPos = true;
                 //trackFlag = false;
             }
             else
             {
-                position2->setFixedAlt( position2->getFixedRate() * 20 );
+                position2->setFixedAlt( position2->getFixedRate() * CONTROL_FIXED_RATE );
                 manualPos2 = true;
                 //trackFlag = false;
             }
@@ -335,13 +338,13 @@ int ObjectControl::processMsg()
             //position->setFixedAlt( -1 );
             if( selector == 0 )
             {
-                position->setFixedAlt( position->getFixedRate() * (-20) );
+                position->setFixedAlt( position->getFixedRate() * (-CONTROL_FIXED_RATE) );
                 manualPos = true;
                 //trackFlag = false;
             }
             else
             {
-                position2->setFixedAlt( position2->getFixedRate() * (-20) );
+                position2->setFixedAlt( position2->getFixedRate() * (-CONTROL_FIXED_RATE) );
                 manualPos2 = true;
                 //trackFlag = false;
             }            
@@ -353,13 +356,13 @@ int ObjectControl::processMsg()
             //position->setFixedAzm( -1 );
             if( selector == 0 )
             {
-                position->setFixedAzm( position->getFixedRate() * (-20) ); 
+                position->setFixedAzm( position->getFixedRate() * (-CONTROL_FIXED_RATE) ); 
                 manualPos = true;
                 //trackFlag = false;
             }
             else
             {
-                position2->setFixedAzm( position2->getFixedRate() * (-20) ); 
+                position2->setFixedAzm( position2->getFixedRate() * (-CONTROL_FIXED_RATE) ); 
                 manualPos2 = true;
                 //trackFlag = false;
             }            
@@ -371,13 +374,13 @@ int ObjectControl::processMsg()
             //position->setFixedAzm( 1 );
             if( selector == 0 )
             {
-                position->setFixedAzm( position->getFixedRate() * 20 );   
+                position->setFixedAzm( position->getFixedRate() * CONTROL_FIXED_RATE );   
                 manualPos = true;
                 //trackFlag = false;
             }
             else
             {
-                position2->setFixedAzm( position2->getFixedRate() * 20 );  
+                position2->setFixedAzm( position2->getFixedRate() * CONTROL_FIXED_RATE );  
                 manualPos2 = true;
                 //trackFlag = false;
             }             
