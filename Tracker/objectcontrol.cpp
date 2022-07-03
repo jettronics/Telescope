@@ -22,12 +22,10 @@ ObjectControl::ObjectControl(Position *position, Position *position2)
     : position(position)
     , position2(position2)
     , ctrlPos(0,0)
-    , Kp(0.2)//Kp(0.4) Kp(0.5)
-    , Ti(0.005)//Ti(0.015) Ti(0.009)
+    , Kp(0.205)//Kp(0.4) Kp(0.5)
     , Td(0.5)
     , width(0)
     , height(0)
-    , uKiOld(0,0)
     , arcsecondPerPixel(0)
     , arcsecondsSpeedLimitedOld(0,0)
     , initFlag(true)
@@ -37,6 +35,7 @@ ObjectControl::ObjectControl(Position *position, Position *position2)
     , manualPos(false)
     , manualPos2(false)    
     , selector(0)
+    , dt(0.25)
 {
     speedFieldOut[0] = 0;
     speedFieldOut[1] = 0;
@@ -48,6 +47,7 @@ ObjectControl::ObjectControl(Position *position, Position *position2)
     cycleTimeStart = clock();
     inPosBuf = Point2d(0.0,0.0);
     speedObj = Point2d(0,0);
+    clock_gettime(CLOCK_REALTIME, &start);
 }
 
 ObjectControl::ObjectControl(Position *position, Position *position2, ProcMessage *proc)
@@ -55,12 +55,10 @@ ObjectControl::ObjectControl(Position *position, Position *position2, ProcMessag
     , position2(position2)    
     , procMsg(proc)
     , ctrlPos(0,0)
-    , Kp(0.2)//Kp(0.4) Kp(0.5)
-    , Ti(0.005)//Ti(0.015) Ti(0.009)
+    , Kp(0.205)//Kp(0.4) Kp(0.5)
     , Td(0.5) //Object speed -> 8 entries every 0.25s = 2s -> 0.5 1/s
     , width(0)
     , height(0)
-    , uKiOld(0,0)
     , arcsecondPerPixel(0)
     , arcsecondsSpeedLimitedOld(0,0)
     , initFlag(true)
@@ -69,7 +67,8 @@ ObjectControl::ObjectControl(Position *position, Position *position2, ProcMessag
     , predictCalc(false)
     , manualPos(false) 
     , manualPos2(false)        
-    , selector(0)       
+    , selector(0)   
+    , dt(0.25)
 {
     speedFieldOut[0] = 0;
     speedFieldOut[1] = 0;
@@ -81,6 +80,7 @@ ObjectControl::ObjectControl(Position *position, Position *position2, ProcMessag
     cycleTimeStart = clock();
     inPosBuf = Point2d(0.0,0.0);
     speedObj = Point2d(0,0);
+    clock_gettime(CLOCK_REALTIME, &start);
 }
 
 
@@ -92,7 +92,6 @@ ObjectControl::~ObjectControl()
 void ObjectControl::init(double width, double height)
 {
     cout << "init = " << width << "x" << height << endl;
-    uKiOld = Point2d(0,0);
     
     //arcsecondPerPixel = 9802.0 / height;
     arcsecondPerPixel = 857.0 / height;
@@ -144,9 +143,12 @@ void ObjectControl::process()
         {
             deltaInPos[i] = inPosArc;
         }
+        for( int i=0; i<8; i++ )
+        {
+            dtPos[i] = dt;
+        }
         initFlag = false;
     }
-    
         
     Point2d uDiff = inPosArc - ctrlPos;
     //cout << "uDiff = " << uDiff << "''" << endl;
@@ -154,55 +156,27 @@ void ObjectControl::process()
     Point2d uKp = Kp * uDiff;
     //cout << "uKp = " << uKp << "''/s" << endl;
     
-    Point2d uKi = (Ti * uDiff)+uKiOld;
-    if( uKi.x >= 35.7 )
+    double dtSum = dt;
+    for( int i=0; i<7; i++ )
     {
-        uKi.x = 35.7;
+       dtPos[7-i] = dtPos[6-i];
+       dtSum += dtPos[6-i];
     }
-    else
-    if( uKi.x <= -35.7 )
-    {
-        uKi.x = -35.7;
-    }
-    
-    if( uKi.y >= 35.7 )
-    {
-        uKi.y = 35.7;
-    }
-    else
-    if( uKi.y <= -35.7 )
-    {
-        uKi.y = -35.7;
-    }
-/*   
-    if( (uDiff.x < 3.6) && (uDiff.x > -3.6) )
-    {
-        uKiOld.x = 0.0;
-    }
-    else
-    {
-        uKiOld.x = uKi.x;
-    }
-    
-    if( (uDiff.y < 3.6) && (uDiff.y > -3.6) )
-    {
-        uKiOld.y = 0.0;
-    }
-    else
-    {
-        uKiOld.y = uKi.y;
-    }
-*/            
+    dtPos[0] = dt;
+    Td = ((double)1.0) / dtSum;
+    //cout << "Td = " << Td << "1/s" << ", dt = " << dt << "s" << endl;
+
     for( int i=0; i<7; i++ )
     {
         deltaInPos[7-i] = deltaInPos[6-i];
     }
     deltaInPos[0] = inPosArc;
+
     //cout << "uKi = " << uKi << "''/s" << endl;
     Point2d uKd = Td * (deltaInPos[0]-deltaInPos[7]); 
     //cout << "uKd = " << uKd << "''/s" << endl;
     
-    Point2d uPID = uKp + uKi + uKd;
+    Point2d uPID = uKp + uKd;
     //cout << "uPID = " << uPID << "''/s" << endl;
     
     Point2i arcsecondsSpeed = static_cast<Point2i>(uPID);  
@@ -253,7 +227,8 @@ int ObjectControl::processMsg()
 {
     int ret = 0;
     
-    controlCycleTime();
+    //controlCycleTime();
+    measureCycleTime();
     
     string rec = procMsg->receiveServerFromClient();
     if( rec.length() > 1 )
@@ -348,7 +323,7 @@ int ObjectControl::processMsg()
             }
             else
             {
-                position2->setFixedAlt( position->getFixedRate() * 20 );
+                position2->setFixedAlt( position2->getFixedRate() * 20 );
                 manualPos2 = true;
                 //trackFlag = false;
             }
@@ -366,7 +341,7 @@ int ObjectControl::processMsg()
             }
             else
             {
-                position2->setFixedAlt( position->getFixedRate() * (-20) );
+                position2->setFixedAlt( position2->getFixedRate() * (-20) );
                 manualPos2 = true;
                 //trackFlag = false;
             }            
@@ -384,7 +359,7 @@ int ObjectControl::processMsg()
             }
             else
             {
-                position2->setFixedAzm( position->getFixedRate() * (-20) ); 
+                position2->setFixedAzm( position2->getFixedRate() * (-20) ); 
                 manualPos2 = true;
                 //trackFlag = false;
             }            
@@ -402,7 +377,7 @@ int ObjectControl::processMsg()
             }
             else
             {
-                position2->setFixedAzm( position->getFixedRate() * 20 );  
+                position2->setFixedAzm( position2->getFixedRate() * 20 );  
                 manualPos2 = true;
                 //trackFlag = false;
             }             
@@ -572,4 +547,15 @@ void ObjectControl::controlCycleTime()
 
     
     return;
+}
+
+void ObjectControl::measureCycleTime()
+{
+   usleep(245000);
+
+   clock_gettime(CLOCK_REALTIME, &end);
+   dt = (end.tv_sec - start.tv_sec) + (end.tv_nsec - start.tv_nsec) * 0.000000001;
+   clock_gettime(CLOCK_REALTIME, &start);
+
+   return;
 }

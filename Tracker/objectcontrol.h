@@ -23,15 +23,15 @@ private:
    Point2i speedLimit(Point2i speed);
    Point2i speedMax(Point2i speed);
    void controlCycleTime();
+   void measureCycleTime();
    
 private:
    Position *position;
    Position *position2;
    ProcMessage *procMsg;
    Point2d ctrlPos;
-   double Kp, Ti, Td;
+   double Kp, Td;
    double width, height;
-   Point2d uKiOld;
    double arcsecondPerPixel;
    Point2i arcsecondsSpeedLimitedOld;
    int speedFieldOut[2];
@@ -46,6 +46,9 @@ private:
    bool manualPos;
    bool manualPos2;   
    int selector;
+   double dt;
+   double dtPos[8];
+   struct timespec start, end;
 };
 
 
