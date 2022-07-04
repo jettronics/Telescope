@@ -23,6 +23,7 @@ The following picture shows the Pin wiring for RS232 port on Hand controller of 
 Note that there is a need of a RS232 voltage level shifter to communicate with an external PC.
 #### USB Interface to NexStar 8 SE
 The USB port can be used directly to communicate with external devices.
+Note that to recognize the USB Port correctly the USB cable needs to be plugged before starting up main controller.
 
 ### Optical focus motor
 Manually focusing by hand causes wiggle in the observing object. To avoid this a small motor is mounted on the Telescope focus.
@@ -69,7 +70,7 @@ With following tab the Telescope can be slewed to the desired object position by
 ![Position Screen Shot](/Images/PositionScreenShot.jpg)  
 - With the squared icon buttons the slewing can be stopped
 - With the Speed slider the slewing rate can be set
-- With the selector the Telescope can be selected which needs to be slewed
+- With the selector the Telescope can be selected which needs to be slewed. Master Telescope (camera mounted) left selection.
 ### Focus
 The Focus tab is used to focus the object shown in camera stream.
 
