@@ -109,7 +109,7 @@ void ObjectControl::init(double width, double height)
     //inPosArc = arcsecondPerPixel * inPosBuf;
     
     arcsecondsSpeedLimitedOld = Point2i(0,0);
-    arcsecondsSpeedPredict = Point2i(15,0);
+    arcsecondsSpeedPredict = Point2i(0,0);
     
     speedFieldOut[0] = 0;
     speedFieldOut[1] = 0;
@@ -194,8 +194,9 @@ void ObjectControl::process()
     if( predictCalc == false )
     {
         Point2d arcsecondsSpeedTemp;
-        arcsecondsSpeedTemp.x = arcsecondsSpeedPredict.x + (0.01 * ((double)arcsecondsSpeedLimited.x - arcsecondsSpeedPredict.x));
-        arcsecondsSpeedTemp.y = arcsecondsSpeedPredict.y + (0.01 * ((double)arcsecondsSpeedLimited.y - arcsecondsSpeedPredict.y));
+        double invTau = dt / (20.0 + dt);
+        arcsecondsSpeedTemp.x = arcsecondsSpeedPredict.x + (invTau * ((double)arcsecondsSpeedLimited.x - arcsecondsSpeedPredict.x));
+        arcsecondsSpeedTemp.y = arcsecondsSpeedPredict.y + (invTau * ((double)arcsecondsSpeedLimited.y - arcsecondsSpeedPredict.y));
         arcsecondsSpeedPredict.x = arcsecondsSpeedTemp.x;
         arcsecondsSpeedPredict.y = arcsecondsSpeedTemp.y;
         //cout << "Mean arcsecLim/s = " << arcsecondsSpeedPredict << "''/s" << endl;
