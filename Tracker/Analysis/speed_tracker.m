@@ -7,28 +7,40 @@ Fs = 10;
 T = 1/Fs;
 
 % Buffer length
-L = 640;
+L = 1000;
 
 % Create a time base
 t = (0:L-1)*T;
 
-v_o = zeros(2,L);
-v_t = zeros(2,L);
-v_c = zeros(2,L);
+v_o = zeros(1,L);
+v_t = zeros(1,L);
+v_c = zeros(1,L);
 
-p_o = zeros(2,L);
-p_o_sim = zeros(2,L);
-p_t = zeros(2,L);
+p_t = zeros(1,L); % -> p_c
+
+p_o = sin((6.28*Fs/500*t)+1.25);
+
+T_c = 5;
 
 for i=1:L
-  p_o_sim(1,i) = i;
-  p_o_sim(2,i) = 0.05 * (p_o_sim(1,i)-340)^2 + 0.5 * (p_o_sim(1,i)-340) + 100;
+  v_c(i) = (p_o(i) - p_t(i))/T_c;
+  if i > 1
+    v_o(i) = ((p_o(i) - p_t(i)) - (p_o(i-1) - p_t(i-1)))/T;
+  endif
 end
 
 figure(1)
 clf
 subplot(1,1,1)
-%plot(s_hat(:,1),s_hat(:,2))
-plot(p_o_sim(1,:), p_o_sim(2,:))
-xlim([0 640])
-ylim([0 380])
+plot(t, v_c, 'b')
+hold
+plot(t, v_o, 'g')
+hold
+%xlim([0 640])
+%ylim([-2 2])
+
+figure(2)
+clf
+subplot(1,1,1)
+plot(t, p_o)
+hold
