@@ -41,15 +41,18 @@ end
 
 figure(1)
 clf
-subplot(2,1,1)
+subplot(3,1,1)
 plot(t, p_o_in, 'b')
 hold
 plot(t, p_o_out, 'g')
 hold
-subplot(2,1,2)
+subplot(3,1,2)
 plot(t, v_o_in, 'b')
 hold
 plot(t, v_o_out, 'g')
+hold
+subplot(3,1,3)
+plot(t, v_t, 'k')
 hold
 
 %xlim([0 640])
