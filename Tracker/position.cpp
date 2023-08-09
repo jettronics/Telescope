@@ -13,6 +13,7 @@
 #include <vector>
 #include <array>
 
+#include "setup.h"
 #include "position.h"
 
 Position::Position()

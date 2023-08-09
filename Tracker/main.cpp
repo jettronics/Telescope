@@ -18,6 +18,7 @@
 #include <raspicam/raspicam_cv.h>
 #include <raspicam/raspicam.h>
 
+#include "setup.h"
 #include "tcpsocketcom.h"
 #include "procmessage.h"
 #include "focus.h"

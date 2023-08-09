@@ -11,6 +11,7 @@
 #include <math.h>
 #include <vector>
 
+#include "setup.h"
 #include "procmessage.h"
 #include "focus.h"
 
