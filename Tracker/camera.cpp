@@ -363,6 +363,7 @@ int Camera::process( void )
                 drawMarker( imagetrack, roipt, Scalar( 255, 255, 255 ), MARKER_CROSS, ((int)roi.width >> 2), 2, 1 );
             }
             
+#ifdef FOCUS_yes
             if( enAutoFocus == true )
             {
                 string recFoc = procMsg->receiveClientFromServer();
@@ -381,6 +382,7 @@ int Camera::process( void )
             {
                 sendFocus();
             }
+#endif
           
             if( recordVideo == true )
             {
@@ -529,6 +531,7 @@ int Camera::setControl( string prop )
 
     if( (pos = prop.rfind("Position")) != string::npos )
     {
+#if defined(COMM_RS232_yes) && defined(COMM_USB_yes)
         if( (pos = prop.rfind("Positionsel=")) != string::npos )
         {
             string sub = prop.substr(pos+12);
@@ -537,7 +540,7 @@ int Camera::setControl( string prop )
             string strSend = "sel=" + sub;
             posMsg->sendClientToServer(strSend);
         } 
-        
+#endif
         if( (pos = prop.rfind("Positionspeed=")) != string::npos )
         {
             string sub = prop.substr(pos+14);
@@ -590,6 +593,7 @@ int Camera::setControl( string prop )
         }  
     }
     else
+#ifdef FOCUS_yes
     if( (pos = prop.rfind("Focus")) != string::npos )
     {
         if( (pos = prop.rfind("Focusauto=true")) != string::npos )
@@ -639,6 +643,7 @@ int Camera::setControl( string prop )
         }  
     }
     else
+#endif
     if( (pos = prop.rfind("Display")) != string::npos )
     {
         if( (pos = prop.rfind("Display=false")) != string::npos )

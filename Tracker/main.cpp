@@ -103,8 +103,12 @@ int main(int argc, char *argv[])
         while( 1 )
         {
             exitCond = objectcontrol.processMsg();
+#ifdef COMM_RS232_yes
             position.process();
+#endif
+#ifdef COMM_USB_yes
             posUsb->process();
+#endif
             
             if( exitCond < 0 )
             {
@@ -122,7 +126,8 @@ int main(int argc, char *argv[])
     }
     else if (pid[1] == 0 && pid[0] > 0) 
     {
-        Focus focus(&msgFocCam);
+#ifdef FOCUS_yes
+    	Focus focus(&msgFocCam);
         
         focus.init();
         
@@ -135,7 +140,7 @@ int main(int argc, char *argv[])
         }
         
         focus.deInit();
-        
+#endif
         exit(0);
     }
     else

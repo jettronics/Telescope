@@ -22,8 +22,9 @@ public:
 private:
    Point2i speedLimit(Point2i speed);
    Point2i speedMax(Point2i speed);
-   void controlCycleTime();
    void measureCycleTime();
+   void controlPosition();
+   void controlSpeed();
    
 private:
    Position *position;

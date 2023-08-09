@@ -130,109 +130,128 @@ void ObjectControl::deInit()
     //position->setFixedAlt( 0 );
 }
 
+void ObjectControl::controlPosition()
+{
+	Point2d inPosArc = arcsecondPerPixel * inPosBuf;
+	// Just for testing
+	/*if( inPosArc.x < 2000 )
+	{
+		inPosArc.x += 3.75;
+	}*/
+
+	//cout << dec << "inPosArc = " << inPosArc << "''" << endl;
+
+	if( initFlag == true )
+	{
+		for( int i=0; i<8; i++ )
+		{
+			deltaInPos[i] = inPosArc;
+		}
+		for( int i=0; i<8; i++ )
+		{
+			dtPos[i] = dt;
+		}
+		initFlag = false;
+	}
+
+	Point2d uDiff = inPosArc - ctrlPos;
+	//cout << "uDiff = " << uDiff << "''" << endl;
+
+	Point2d uKp = Kp * uDiff;
+	//cout << "uKp = " << uKp << "''/s" << endl;
+
+	double dtSum = dt;
+	for( int i=0; i<7; i++ )
+	{
+	   dtPos[7-i] = dtPos[6-i];
+	   dtSum += dtPos[6-i];
+	}
+	dtPos[0] = dt;
+	Td = ((double)1.0) / dtSum;
+	//cout << "Td = " << Td << "1/s" << ", dt = " << dt << "s" << endl;
+
+	for( int i=0; i<7; i++ )
+	{
+		deltaInPos[7-i] = deltaInPos[6-i];
+	}
+	deltaInPos[0] = inPosArc;
+
+	//cout << "uKi = " << uKi << "''/s" << endl;
+	Point2d uKd = Td * (deltaInPos[0]-deltaInPos[7]);
+	//cout << "uKd = " << uKd << "''/s" << endl;
+
+	Point2d uPID = uKp + uKd;
+	//cout << "uPID = " << uPID << "''/s" << endl;
+
+	Point2i arcsecondsSpeed = static_cast<Point2i>(uPID);
+	arcsecondsSpeed.y = -arcsecondsSpeed.y;
+	//cout << "arcsec/s = " << arcsecondsSpeed << "''/s" << endl;
+
+	Point2i arcsecondsSpeedLimited;
+	arcsecondsSpeedLimited = speedMax( arcsecondsSpeed );
+	//arcsecondsSpeedLimited = speedLimit( arcsecondsSpeed );
+
+	//cout << "uDiff = " << uDiff << "''" << endl;
+	if( predictCalc == false )
+	{
+		Point2d arcsecondsSpeedTemp;
+		double invTau = dt / (20.0 + dt);
+		arcsecondsSpeedTemp.x = arcsecondsSpeedPredict.x + (invTau * ((double)arcsecondsSpeedLimited.x - arcsecondsSpeedPredict.x));
+		arcsecondsSpeedTemp.y = arcsecondsSpeedPredict.y + (invTau * ((double)arcsecondsSpeedLimited.y - arcsecondsSpeedPredict.y));
+		arcsecondsSpeedPredict.x = arcsecondsSpeedTemp.x;
+		arcsecondsSpeedPredict.y = arcsecondsSpeedTemp.y;
+		//cout << "Mean arcsecLim/s = " << arcsecondsSpeedPredict << "''/s" << endl;
+		//cout << "Act  arcsecLim/s = " << arcsecondsSpeedLimited << "''/s" << endl;
+	}
+	else
+	{
+		arcsecondsSpeedLimited = arcsecondsSpeedPredict;
+		//cout << "Predict arcsecLim/s = " << arcsecondsSpeedLimited << "''/s" << endl;
+	}
+
+#ifdef COMM_RS232_yes
+	if( manualPos == false )
+	{
+		position->setVariableAzm(arcsecondsSpeedLimited.x);
+		//cout << dec << "arcsecLim/s = " << arcsecondsSpeedLimited << "''/s" << endl;
+		position->setVariableAlt(arcsecondsSpeedLimited.y);
+		//cout << dec << "arcsecLim/s = " << arcsecondsSpeedLimited << "''/s" << endl;
+	}
+#endif
+#ifdef COMM_USB_yes
+	if( manualPos2 == false )
+	{
+		position2->setVariableAzm(arcsecondsSpeedLimited.x);
+		position2->setVariableAlt(arcsecondsSpeedLimited.y);
+	}
+#endif
+
+	//arcsecondsSpeedLimitedOld = arcsecondsSpeedLimited;
+
+    return;
+}
+
+void ObjectControl::controlSpeed()
+{
+
+}
+
 void ObjectControl::process()
 {
-    Point2d inPosArc = arcsecondPerPixel * inPosBuf;
-    // Just for testing
-    /*if( inPosArc.x < 2000 )
-    {
-        inPosArc.x += 3.75;
-    }*/
+#ifdef OBJ_CTRL_by_POS
+	controlPosition();
+#endif
+#ifdef OBJ_CTRL_by_SPEED
+	controlSpeed();
+#endif
 
-    //cout << dec << "inPosArc = " << inPosArc << "''" << endl;
-    
-    if( initFlag == true )
-    {
-        for( int i=0; i<8; i++ )
-        {
-            deltaInPos[i] = inPosArc;
-        }
-        for( int i=0; i<8; i++ )
-        {
-            dtPos[i] = dt;
-        }
-        initFlag = false;
-    }
-        
-    Point2d uDiff = inPosArc - ctrlPos;
-    //cout << "uDiff = " << uDiff << "''" << endl;
-    
-    Point2d uKp = Kp * uDiff;
-    //cout << "uKp = " << uKp << "''/s" << endl;
-    
-    double dtSum = dt;
-    for( int i=0; i<7; i++ )
-    {
-       dtPos[7-i] = dtPos[6-i];
-       dtSum += dtPos[6-i];
-    }
-    dtPos[0] = dt;
-    Td = ((double)1.0) / dtSum;
-    //cout << "Td = " << Td << "1/s" << ", dt = " << dt << "s" << endl;
-
-    for( int i=0; i<7; i++ )
-    {
-        deltaInPos[7-i] = deltaInPos[6-i];
-    }
-    deltaInPos[0] = inPosArc;
-
-    //cout << "uKi = " << uKi << "''/s" << endl;
-    Point2d uKd = Td * (deltaInPos[0]-deltaInPos[7]); 
-    //cout << "uKd = " << uKd << "''/s" << endl;
-    
-    Point2d uPID = uKp + uKd;
-    //cout << "uPID = " << uPID << "''/s" << endl;
-    
-    Point2i arcsecondsSpeed = static_cast<Point2i>(uPID);  
-    arcsecondsSpeed.y = -arcsecondsSpeed.y; 
-    //cout << "arcsec/s = " << arcsecondsSpeed << "''/s" << endl;
-    
-    Point2i arcsecondsSpeedLimited;
-    arcsecondsSpeedLimited = speedMax( arcsecondsSpeed );
-    //arcsecondsSpeedLimited = speedLimit( arcsecondsSpeed );
-    
-    //cout << "uDiff = " << uDiff << "''" << endl;
-    if( predictCalc == false )
-    {
-        Point2d arcsecondsSpeedTemp;
-        double invTau = dt / (20.0 + dt);
-        arcsecondsSpeedTemp.x = arcsecondsSpeedPredict.x + (invTau * ((double)arcsecondsSpeedLimited.x - arcsecondsSpeedPredict.x));
-        arcsecondsSpeedTemp.y = arcsecondsSpeedPredict.y + (invTau * ((double)arcsecondsSpeedLimited.y - arcsecondsSpeedPredict.y));
-        arcsecondsSpeedPredict.x = arcsecondsSpeedTemp.x;
-        arcsecondsSpeedPredict.y = arcsecondsSpeedTemp.y;
-        //cout << "Mean arcsecLim/s = " << arcsecondsSpeedPredict << "''/s" << endl;
-        //cout << "Act  arcsecLim/s = " << arcsecondsSpeedLimited << "''/s" << endl;
-    }
-    else
-    {
-        arcsecondsSpeedLimited = arcsecondsSpeedPredict;
-        //cout << "Predict arcsecLim/s = " << arcsecondsSpeedLimited << "''/s" << endl;
-    }
-    
-    if( manualPos == false )
-    {
-        position->setVariableAzm(arcsecondsSpeedLimited.x);
-        //cout << dec << "arcsecLim/s = " << arcsecondsSpeedLimited << "''/s" << endl;
-        position->setVariableAlt(arcsecondsSpeedLimited.y);
-        //cout << dec << "arcsecLim/s = " << arcsecondsSpeedLimited << "''/s" << endl;
-    }
-    
-    if( manualPos2 == false )
-    {   
-        position2->setVariableAzm(arcsecondsSpeedLimited.x);
-        position2->setVariableAlt(arcsecondsSpeedLimited.y); 
-    }
-        
-    //arcsecondsSpeedLimitedOld = arcsecondsSpeedLimited;
-    
-    return;
+	return;
 }
 
 int ObjectControl::processMsg()
 {
     int ret = 0;
     
-    //controlCycleTime();
     measureCycleTime();
     
     string rec = procMsg->receiveServerFromClient();
@@ -294,7 +313,8 @@ int ObjectControl::processMsg()
                 }
             }
         }
-        
+
+#if defined(COMM_RS232_yes) && defined(COMM_USB_yes)
         if( (pos = rec.rfind("sel=")) != string::npos )
         {
             string sub = rec.substr(pos+4);
@@ -302,6 +322,7 @@ int ObjectControl::processMsg()
             selector = (int)stoi(sub);
         }
         else
+#endif
         if( (pos = rec.rfind("rate=")) != string::npos )
         {
             string sub = rec.substr(pos+5);
@@ -319,7 +340,7 @@ int ObjectControl::processMsg()
         if( (pos = rec.rfind("alt=1")) != string::npos )
         {
             cout << "alt=1" << endl;
-            //position->setFixedAlt( 1 );
+#if defined(COMM_RS232_yes) && defined(COMM_USB_yes)
             if( selector == 0 )
             {
                 position->setFixedAlt( (int)position->getFixedRate() * CONTROL_FIXED_RATE );
@@ -332,12 +353,19 @@ int ObjectControl::processMsg()
                 manualPos2 = true;
                 //trackFlag = false;
             }
+#elif defined(COMM_RS232_yes) && defined(COMM_USB_no)
+            position->setFixedAlt( (int)position->getFixedRate() * CONTROL_FIXED_RATE );
+            manualPos = true;
+#elif defined(COMM_RS232_no) && defined(COMM_USB_yes)
+            position2->setFixedAlt( position2->getFixedRate() * CONTROL_FIXED_RATE );
+            manualPos2 = true;
+#endif
         }  
         else
         if( (pos = rec.rfind("alt=-1")) != string::npos )
         {
             cout << "alt=-1" << endl;
-            //position->setFixedAlt( -1 );
+#if defined(COMM_RS232_yes) && defined(COMM_USB_yes)
             if( selector == 0 )
             {
                 position->setFixedAlt( position->getFixedRate() * (-CONTROL_FIXED_RATE) );
@@ -349,13 +377,20 @@ int ObjectControl::processMsg()
                 position2->setFixedAlt( position2->getFixedRate() * (-CONTROL_FIXED_RATE) );
                 manualPos2 = true;
                 //trackFlag = false;
-            }            
+            }
+#elif defined(COMM_RS232_yes) && defined(COMM_USB_no)
+            position->setFixedAlt( position->getFixedRate() * (-CONTROL_FIXED_RATE) );
+            manualPos = true;
+#elif defined(COMM_RS232_no) && defined(COMM_USB_yes)
+            position2->setFixedAlt( position2->getFixedRate() * (-CONTROL_FIXED_RATE) );
+            manualPos2 = true;
+#endif
         }  
         else
         if( (pos = rec.rfind("azm=-1")) != string::npos )
         {
             cout << "azm=-1" << endl;
-            //position->setFixedAzm( -1 );
+#if defined(COMM_RS232_yes) && defined(COMM_USB_yes)
             if( selector == 0 )
             {
                 position->setFixedAzm( position->getFixedRate() * (-CONTROL_FIXED_RATE) ); 
@@ -367,13 +402,20 @@ int ObjectControl::processMsg()
                 position2->setFixedAzm( position2->getFixedRate() * (-CONTROL_FIXED_RATE) ); 
                 manualPos2 = true;
                 //trackFlag = false;
-            }            
+            }
+#elif defined(COMM_RS232_yes) && defined(COMM_USB_no)
+            position->setFixedAzm( position->getFixedRate() * (-CONTROL_FIXED_RATE) );
+            manualPos = true;
+#elif defined(COMM_RS232_no) && defined(COMM_USB_yes)
+            position2->setFixedAzm( position2->getFixedRate() * (-CONTROL_FIXED_RATE) );
+            manualPos2 = true;
+#endif
         }  
         else
         if( (pos = rec.rfind("azm=1")) != string::npos )
         {
             cout << "azm=1" << endl;
-            //position->setFixedAzm( 1 );
+#if defined(COMM_RS232_yes) && defined(COMM_USB_yes)
             if( selector == 0 )
             {
                 position->setFixedAzm( position->getFixedRate() * CONTROL_FIXED_RATE );   
@@ -385,13 +427,20 @@ int ObjectControl::processMsg()
                 position2->setFixedAzm( position2->getFixedRate() * CONTROL_FIXED_RATE );  
                 manualPos2 = true;
                 //trackFlag = false;
-            }             
+            }
+#elif defined(COMM_RS232_yes) && defined(COMM_USB_no)
+            position->setFixedAzm( position->getFixedRate() * CONTROL_FIXED_RATE );
+            manualPos = true;
+#elif defined(COMM_RS232_no) && defined(COMM_USB_yes)
+            position2->setFixedAzm( position2->getFixedRate() * CONTROL_FIXED_RATE );
+            manualPos2 = true;
+#endif
         }  
         else
         if( (pos = rec.rfind("alt=0")) != string::npos )
         {
             cout << "alt=0" << endl;
-            //position->setFixedAlt( 0 );
+#if defined(COMM_RS232_yes) && defined(COMM_USB_yes)
             if( selector == 0 )
             {
                 position->setFixedAlt( 0 );   
@@ -404,12 +453,19 @@ int ObjectControl::processMsg()
                 manualPos2 = false;
                 //trackFlag = false;
             }   
+#elif defined(COMM_RS232_yes) && defined(COMM_USB_no)
+            position->setFixedAlt( 0 );
+            manualPos = false;
+#elif defined(COMM_RS232_no) && defined(COMM_USB_yes)
+            position2->setFixedAlt( 0 );
+            manualPos2 = false;
+#endif
         }  
         else
         if( (pos = rec.rfind("azm=0")) != string::npos )
         {
             cout << "azm=0" << endl;
-            //position->setFixedAzm( 0 );
+#if defined(COMM_RS232_yes) && defined(COMM_USB_yes)
             if( selector == 0 )
             {
                 position->setFixedAzm( 0 );   
@@ -421,7 +477,14 @@ int ObjectControl::processMsg()
                 position2->setFixedAzm( 0 ); 
                 manualPos2 = false;
                 //trackFlag = false;
-            }              
+            }
+#elif defined(COMM_RS232_yes) && defined(COMM_USB_no)
+            position->setFixedAzm( 0 );
+            manualPos = false;
+#elif defined(COMM_RS232_no) && defined(COMM_USB_yes)
+            position2->setFixedAzm( 0 );
+            manualPos2 = false;
+#endif
         }  
         else
         if( (pos = rec.find("exit")) != string::npos )
@@ -528,30 +591,6 @@ Point2i ObjectControl::speedMax(Point2i speed)
     }
         
     return retSpeed;
-}
-
-void ObjectControl::controlCycleTime()
-{
-    // Call Tracking Control algorithm
-    clock_t cycleTimeStop = clock();
-    double cycleTimeDiff = double(cycleTimeStop - cycleTimeStart)/CLOCKS_PER_SEC;
-    if( cycleTimeDiff < (double)CONTROL_CYCLE_TIME )
-    {
-        unsigned int waitCycle = (CONTROL_CYCLE_TIME - cycleTimeDiff) * 1000000;
-        //cout << "cycleTimeDiff: " << cycleTimeDiff << endl;
-        //cout << "wait: " << waitCycle << endl;
-        //cout.flush();
-        usleep( waitCycle );
-    }
-    
-    cycleTimeStart = clock();
-    //cout << "cycleTimeDiff: " << cycleTimeDiff << endl;
-    //cout << "waitTimeDiff: " << waitTimeDiff << endl;
-    //cout << "Object: x: " << roipt.x << ", y: " << roipt.y << endl;
-    //cout.flush();
-
-    
-    return;
 }
 
 void ObjectControl::measureCycleTime()
