@@ -12,4 +12,7 @@
 //#define OBJ_CTRL_by_POS
 #define OBJ_CTRL_by_SPEED
 
+//#define TELESCOPE_4SE
+#define TELESCOPE_8SE
+
 #endif

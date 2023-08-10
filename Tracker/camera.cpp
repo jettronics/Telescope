@@ -39,9 +39,15 @@
 
 
 CameraProperties::CameraProperties()
+#ifdef TELESCOPE_8SE
+    : widthVideo(1280) //1441 
+    , widthVideoOld(1280)
+    , heightVideo(960) //1080
+#else
     : widthVideo(640) //1441 
     , widthVideoOld(640)
     , heightVideo(480) //1080
+#endif
     , widthImage(4056)
     , heightImage(3040)
     , brightness(50) //[0,100]
@@ -49,7 +55,11 @@ CameraProperties::CameraProperties()
     , saturation(50) //[0,100]
     , gain(50) //[0,100]
     , exposure(-1) //[1,100] shutter speed from 0 to 33ms
+#ifdef TELESCOPE_8SE
+    , fpsVideo(20)
+#else
     , fpsVideo(10)
+#endif
     , fpsImage(3)
 {
     
@@ -313,7 +323,11 @@ int Camera::process( void )
         cam.grab();
         cam.retrieve(imagein);
         // Mirror image y-axis
+#ifdef TELESCOPE_8SE
+        flip(imagein, imageout, -1);
+#else
         flip(imagein, imageout, 1);
+#endif
         
         imagetrack = imageout.clone();
         

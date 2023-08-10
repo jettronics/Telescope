@@ -40,7 +40,7 @@ private:
    bool initFlag;
    clock_t cycleTimeStart;
    bool trackFlag;
-   Point2d inPosBuf;
+   Point2d inPos;
    Point2d speedObj;
    Point2d arcsecondsSpeedPredict;
    bool predictCalc;

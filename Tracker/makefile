@@ -6,7 +6,7 @@
 OBJ = main.o camera.o tcpsocketcom.o focus.o position.o procmessage.o objectcontrol.o
 
 #Set any dependant header files so that if they are edited they cause a complete re-compile (e.g. main.h some_subfunctions.h some_definitions_file.h ), or leave blank
-DEPS = camera.h tcpsocketcom.h focus.h position.h procmessage.h objectcontrol.h
+DEPS = camera.h tcpsocketcom.h focus.h position.h procmessage.h objectcontrol.h setup.h
 
 #Any special libraries you are using in your project (e.g. -lbcm2835 -lrt `pkg-config --libs gtk+-3.0` ), or leave blank
 #LIBS = -lrt -lraspicam -lraspicam_cv -lmmal -lmmal_core -lmmal_util -lopencv_core -lopencv_highgui 

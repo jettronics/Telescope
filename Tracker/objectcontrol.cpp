@@ -11,8 +11,11 @@
 #include "objectcontrol.h"
 
 
-#define CONTROL_CYCLE_TIME 0.25
+#ifdef TELESCOPE_8SE
+#define CONTROL_FIXED_RATE 200
+#else
 #define CONTROL_FIXED_RATE 40
+#endif
 
 
 ObjectControl::ObjectControl()
@@ -23,12 +26,12 @@ ObjectControl::ObjectControl()
 ObjectControl::ObjectControl(Position *position, Position *position2)
     : position(position)
     , position2(position2)
-    , ctrlPos(0,0)
+    , ctrlPos(0.0,0.0)
     , Kp(0.205)//Kp(0.4) Kp(0.5)
     , Td(0.5)
     , width(0)
     , height(0)
-    , arcsecondPerPixel(0)
+    , arcsecondPerPixel(0.0)
     , arcsecondsSpeedLimitedOld(0,0)
     , initFlag(true)
     , trackFlag(false)
@@ -47,7 +50,7 @@ ObjectControl::ObjectControl(Position *position, Position *position2)
         deltaInPos[i] = Point2d(0,0);
     }
     cycleTimeStart = clock();
-    inPosBuf = Point2d(0.0,0.0);
+    inPos = Point2d(0.0,0.0);
     speedObj = Point2d(0,0);
     clock_gettime(CLOCK_REALTIME, &start);
 }
@@ -61,7 +64,7 @@ ObjectControl::ObjectControl(Position *position, Position *position2, ProcMessag
     , Td(0.5) //Object speed -> 8 entries every 0.25s = 2s -> 0.5 1/s
     , width(0)
     , height(0)
-    , arcsecondPerPixel(0)
+    , arcsecondPerPixel(0.0)
     , arcsecondsSpeedLimitedOld(0,0)
     , initFlag(true)
     , trackFlag(false)
@@ -80,7 +83,7 @@ ObjectControl::ObjectControl(Position *position, Position *position2, ProcMessag
         deltaInPos[i] = Point2d(0,0);
     }
     cycleTimeStart = clock();
-    inPosBuf = Point2d(0.0,0.0);
+    inPos = Point2d(0.0,0.0);
     speedObj = Point2d(0,0);
     clock_gettime(CLOCK_REALTIME, &start);
 }
@@ -95,25 +98,38 @@ void ObjectControl::init(double width, double height)
 {
     cout << "init = " << width << "x" << height << endl;
     
+#ifdef OBJ_CTRL_by_SPEED
+
+    ctrlPos.x = width * 0.5;
+    ctrlPos.y = height * 0.5;
+    
+    inPos.x = width * 0.5;
+    inPos.y = height * 0.5;
+    
+#else
+
     //arcsecondPerPixel = 9802.0 / height;
     arcsecondPerPixel = 857.0 / height;
-    cout << "arcsecondPerPixel = " << arcsecondPerPixel << endl;
-    
+        
     ctrlPos.x = 1143.0 * 0.5;
     ctrlPos.y = 857.0 * 0.5;
     
-    inPosBuf.x = width * 0.5;
-    inPosBuf.y = height * 0.5;
-    cout << dec << "Init inPosBuf = " << inPosBuf << endl;
+    inPos.x = width * 0.5;
+    inPos.y = height * 0.5;
     
     // Just for testing
-    //inPosArc = arcsecondPerPixel * inPosBuf;
+    //inPosArc = arcsecondPerPixel * inPos;
     
     arcsecondsSpeedLimitedOld = Point2i(0,0);
     arcsecondsSpeedPredict = Point2i(0,0);
     
     speedFieldOut[0] = 0;
     speedFieldOut[1] = 0;
+    
+#endif
+
+    cout << "arcsecondPerPixel = " << arcsecondPerPixel << endl;
+    cout << dec << "Init inPos = " << inPos << endl;
     
     initFlag = true;
 }
@@ -132,7 +148,7 @@ void ObjectControl::deInit()
 
 void ObjectControl::controlPosition()
 {
-	Point2d inPosArc = arcsecondPerPixel * inPosBuf;
+	Point2d inPosArc = arcsecondPerPixel * inPos;
 	// Just for testing
 	/*if( inPosArc.x < 2000 )
 	{
@@ -233,7 +249,34 @@ void ObjectControl::controlPosition()
 
 void ObjectControl::controlSpeed()
 {
+    
+    Point2d inDiff = inPos - ctrlPos;
+    
+    Point2d dSpeed = Point2d(0.0,0.0);
+    Point2i arcsecondsSpeed = static_cast<Point2i>(dSpeed);
+	arcsecondsSpeed.y = -arcsecondsSpeed.y;
+    
+    Point2i arcsecondsSpeedLimited;
+	arcsecondsSpeedLimited = speedMax( arcsecondsSpeed );
 
+#ifdef COMM_RS232_yes
+	if( manualPos == false )
+	{
+		position->setVariableAzm(arcsecondsSpeedLimited.x);
+		//cout << dec << "arcsecLim/s = " << arcsecondsSpeedLimited << "''/s" << endl;
+		position->setVariableAlt(arcsecondsSpeedLimited.y);
+		//cout << dec << "arcsecLim/s = " << arcsecondsSpeedLimited << "''/s" << endl;
+	}
+#endif
+#ifdef COMM_USB_yes
+	if( manualPos2 == false )
+	{
+		position2->setVariableAzm(arcsecondsSpeedLimited.x);
+		position2->setVariableAlt(arcsecondsSpeedLimited.y);
+	}
+#endif
+
+    return;
 }
 
 void ObjectControl::process()
@@ -305,8 +348,8 @@ int ObjectControl::processMsg()
                     {
                         string width = sub.substr(startchar+1, xchar-1); 
                         string height = sub.substr(xchar+1, endchar-1); 
-                        inPosBuf.x = (double)stoi(width);
-                        inPosBuf.y = (double)stoi(height);
+                        inPos.x = (double)stoi(width);
+                        inPos.y = (double)stoi(height);
                         trackFlag = true;
                         predictCalc = false;
                     }
@@ -327,6 +370,7 @@ int ObjectControl::processMsg()
         {
             string sub = rec.substr(pos+5);
             cout << "rate: " << (int)stoi(sub) << endl;
+#if defined(COMM_RS232_yes) && defined(COMM_USB_yes)
             if( selector == 0 )
             {
                 position->setFixedRate( (char)stoi(sub) );
@@ -335,6 +379,11 @@ int ObjectControl::processMsg()
             {
                 position2->setFixedRate( (char)stoi(sub) );
             }
+#elif defined(COMM_RS232_yes) && defined(COMM_USB_no)
+            position->setFixedRate( (char)stoi(sub) );
+#elif defined(COMM_RS232_no) && defined(COMM_USB_yes)
+            position2->setFixedRate( (char)stoi(sub) );
+#endif
         }  
         else
         if( (pos = rec.rfind("alt=1")) != string::npos )
