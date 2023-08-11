@@ -13,8 +13,10 @@
 
 #ifdef TELESCOPE_8SE
 #define CONTROL_FIXED_RATE 200
+#define SPEED_MAX_LIMIT 200
 #else
 #define CONTROL_FIXED_RATE 40
+#define SPEED_MAX_LIMIT 100
 #endif
 
 
@@ -23,6 +25,7 @@ ObjectControl::ObjectControl()
 
 }
 
+/*
 ObjectControl::ObjectControl(Position *position, Position *position2)
     : position(position)
     , position2(position2)
@@ -41,6 +44,7 @@ ObjectControl::ObjectControl(Position *position, Position *position2)
     , manualPos2(false)    
     , selector(0)
     , dt(0.25)
+    , normFactor(1.0)
 {
     speedFieldOut[0] = 0;
     speedFieldOut[1] = 0;
@@ -54,6 +58,7 @@ ObjectControl::ObjectControl(Position *position, Position *position2)
     speedObj = Point2d(0,0);
     clock_gettime(CLOCK_REALTIME, &start);
 }
+*/
 
 ObjectControl::ObjectControl(Position *position, Position *position2, ProcMessage *proc)
     : position(position)
@@ -64,16 +69,18 @@ ObjectControl::ObjectControl(Position *position, Position *position2, ProcMessag
     , Td(0.5) //Object speed -> 8 entries every 0.25s = 2s -> 0.5 1/s
     , width(0)
     , height(0)
-    , arcsecondPerPixel(0.0)
+    , arcsecondPerPixel(31.3)
     , arcsecondsSpeedLimitedOld(0,0)
     , initFlag(true)
     , trackFlag(false)
     , arcsecondsSpeedPredict(0,0)
     , predictCalc(false)
+    , arcToPixelMeasurement(false)
     , manualPos(false) 
     , manualPos2(false)        
     , selector(0)   
     , dt(0.25)
+    , normFactor(1.0)
 {
     speedFieldOut[0] = 0;
     speedFieldOut[1] = 0;
@@ -84,6 +91,7 @@ ObjectControl::ObjectControl(Position *position, Position *position2, ProcMessag
     }
     cycleTimeStart = clock();
     inPos = Point2d(0.0,0.0);
+    inPosStart = Point2d(0.0,0.0);
     speedObj = Point2d(0,0);
     clock_gettime(CLOCK_REALTIME, &start);
 }
@@ -105,6 +113,8 @@ void ObjectControl::init(double width, double height)
     
     inPos.x = width * 0.5;
     inPos.y = height * 0.5;
+        
+    inPosStart = inPos;
     
 #else
 
@@ -249,10 +259,36 @@ void ObjectControl::controlPosition()
 
 void ObjectControl::controlSpeed()
 {
-    
     Point2d inDiff = inPos - ctrlPos;
     
+    Point2d inArcDiff = arcsecondPerPixel * inDiff;
+    
     Point2d dSpeed = Point2d(0.0,0.0);
+
+    // arcs to pixel measurement
+    if( arcToPixelMeasurement == true )
+    {
+        dSpeed.x = 150.0;
+        double startMeasure = inPos.x - inPosStart.x;
+        if( (fabs(inDiff.x) > 10.0) && (fabs(startMeasure) > 10.0) )
+        {
+            arcToPixelTime += dt;
+        }
+        else
+        if( (fabs(inDiff.x) < 10.0) )
+        {
+            double arcToPixelDistance = (fabs(inPosStart.x)-10.0) - fabs(inPos.x);
+            cout << dec << "arcs to pixel time = " << arcToPixelTime << "s" << endl;
+            cout << dec << "arcs to pixel distance = " << arcToPixelDistance << "px" << endl;
+            arcsecondPerPixel = (arcToPixelTime / arcToPixelDistance) * dSpeed.x;
+            cout << dec << "arc seconds per pixel = " << arcsecondPerPixel << "arcs/px" << endl;
+            arcToPixelTime = 0.0;
+            arcToPixelDistance = 0.0;
+            arcToPixelMeasurement = false;
+            dSpeed = Point2d(0.0,0.0);
+        } 
+    }
+            
     Point2i arcsecondsSpeed = static_cast<Point2i>(dSpeed);
 	arcsecondsSpeed.y = -arcsecondsSpeed.y;
     
@@ -328,6 +364,11 @@ int ObjectControl::processMsg()
                         string height = sub.substr(xchar+1, endchar-1); 
                         double dwidth = (double)stoi(width);
                         double dheight = (double)stoi(height);
+#ifdef OBJ_CTRL_by_SPEED
+                        normFactor = 1280.0 / dwidth;
+                        dwidth *= normFactor;
+                        dheight *= normFactor;
+#endif
                         init(dwidth, dheight);
                     }
                 }
@@ -350,6 +391,18 @@ int ObjectControl::processMsg()
                         string height = sub.substr(xchar+1, endchar-1); 
                         inPos.x = (double)stoi(width);
                         inPos.y = (double)stoi(height);
+#ifdef OBJ_CTRL_by_SPEED
+                        inPos.x *= normFactor;
+                        inPos.y *= normFactor;
+                        if( trackFlag == false )
+                        {
+                            inPosStart = inPos;
+                            if( arcsecondPerPixel < 0.1 )
+                            {
+                                arcToPixelMeasurement = true;
+                            }
+                        }
+#endif
                         trackFlag = true;
                         predictCalc = false;
                     }
@@ -616,26 +669,26 @@ Point2i ObjectControl::speedMax(Point2i speed)
     Point2i retSpeed;
     
     retSpeed = speed;
-    if( abs(speed.x) > 100 )
+    if( abs(speed.x) > SPEED_MAX_LIMIT )
     {
         if( speed.x < 0 ) 
         {
-            retSpeed.x = -100;
+            retSpeed.x = -SPEED_MAX_LIMIT;
         }
         else
         {
-            retSpeed.x = 100;
+            retSpeed.x = SPEED_MAX_LIMIT;
         }
     }
-    if( abs(speed.y) > 100 )
+    if( abs(speed.y) > SPEED_MAX_LIMIT )
     {
         if( speed.y < 0 ) 
         {
-            retSpeed.y = -100;
+            retSpeed.y = -SPEED_MAX_LIMIT;
         }
         else
         {
-            retSpeed.y = 100;
+            retSpeed.y = SPEED_MAX_LIMIT;
         }
     }
         

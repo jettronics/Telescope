@@ -9,7 +9,7 @@ class ObjectControl
    
 public:
    ObjectControl();
-   ObjectControl(Position *position, Position *position2);
+   //ObjectControl(Position *position, Position *position2);
    ObjectControl(Position *position, Position *position2, ProcMessage *proc);
    virtual ~ObjectControl();
 
@@ -40,16 +40,17 @@ private:
    bool initFlag;
    clock_t cycleTimeStart;
    bool trackFlag;
-   Point2d inPos;
+   Point2d inPos, inPosStart;
    Point2d speedObj;
    Point2d arcsecondsSpeedPredict;
-   bool predictCalc;
+   bool predictCalc, arcToPixelMeasurement;
    bool manualPos;
    bool manualPos2;   
    int selector;
-   double dt;
+   double dt, arcToPixelTime;
    double dtPos[8];
    struct timespec start, end;
+   double normFactor;
 };
 
 
