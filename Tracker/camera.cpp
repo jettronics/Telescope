@@ -32,7 +32,7 @@
 #define NOT_SHOW_CAMERA_WINDOW
 #define OPENCV_WAIT_FOR_KEY 20
 #define STABLE_PHOTO_SHOT (100/OPENCV_WAIT_FOR_KEY)
-#define ROI_WIDTH_RATIO 0.15
+#define ROI_WIDTH_RATIO 0.15 //0.15
 //#define CONTROL_CYCLE_TIME 0.25
 #define TRACKING_METHOD "KCF"
 //#define TRACKING_METHOD "MIL"
@@ -95,6 +95,7 @@ Camera::Camera()
     , zoom(0,0,0,0)  
     , zoomFactor(1)  
     , focusLineLength(0.0)
+    , roiSize(ROI_WIDTH_RATIO)
 {
     objectControl = new ObjectControl;
 }
@@ -189,7 +190,8 @@ Camera::Camera( TcpSocketCom *control, TcpSocketCom *stream, ProcMessage *proc, 
     , focusPos(30)   
     , zoom(0,0,0,0)   
     , zoomFactor(1)  
-    , focusLineLength(0.0)                      
+    , focusLineLength(0.0)
+    , roiSize(ROI_WIDTH_RATIO)                      
 {
     objectControl = nullptr;
 
@@ -605,6 +607,33 @@ int Camera::setControl( string prop )
             //position->setFixedAzm( 0 );
             posMsg->sendClientToServer("azm=0");
         }  
+        
+        if( (pos = prop.rfind("Position=roiup")) != string::npos )
+        {
+            cout << "Position: roi size up" << endl;
+            roiSize += 0.01;
+            if( roiSize > 0.25 )
+            {
+                roiSize = 0.25;
+            }
+            initRoi(roipt);
+            runTracker = false;
+            initTracker = false;
+        } 
+        
+        if( (pos = prop.rfind("Position=roidn")) != string::npos )
+        {
+            cout << "Position: roi size down" << endl;
+            initRoi(roipt);
+            roiSize -= 0.01;
+            if( roiSize < 0.01 )
+            {
+                roiSize = 0.01;
+            }
+            initRoi(roipt);
+            runTracker = false;
+            initTracker = false;
+        } 
     }
     else
 #ifdef FOCUS_yes
@@ -877,11 +906,11 @@ int Camera::setControl( string prop )
 
 void Camera::initRoi(Point2d pnt)
 {
-    roi.width = camProps.widthVideo * ROI_WIDTH_RATIO;
+    roi.width = (double)((int)(camProps.widthVideo * roiSize));
     roi.height = roi.width;
-    roi.x = pnt.x - (roi.width * 0.5);
-    roi.y = pnt.y - (roi.width * 0.5);
-    
+    roi.x = (double)((int)(pnt.x - (roi.width * 0.5)));
+    roi.y = (double)((int)(pnt.y - (roi.width * 0.5)));
+    cout << "ROI rect: " << roi << endl;
 }
 
 void Camera::changeZoom()

@@ -158,6 +158,8 @@ void Position::setFixedAzm( int azm )
 {
     char rh = 0, rl = 0;
     
+    cout << "setFixedAzm: " << azm << endl;
+    
     arrBufAzm[0] = (char)'P';
     //arrBufAzm[1] = (char)2;
     arrBufAzm[1] = (char)3;
@@ -210,6 +212,8 @@ void Position::setFixedAzm( int azm )
 void Position::setFixedAlt( int alt )
 {
     char rh = 0, rl = 0;   
+    
+    cout << "setFixedAlt: " << alt << endl;
     
     arrBufAlt[0] = (char)'P';
     //arrBufAlt[1] = (char)2;
