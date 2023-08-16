@@ -261,8 +261,6 @@ void ObjectControl::controlSpeed()
 {
     Point2d inDiff = inPos - ctrlPos;
     
-    Point2d inArcDiff = arcsecondPerPixel * inDiff;
-    
     Point2d dSpeed = Point2d(0.0,0.0);
 
     // arcs to pixel measurement
@@ -287,6 +285,21 @@ void ObjectControl::controlSpeed()
             arcToPixelMeasurement = false;
             dSpeed = Point2d(0.0,0.0);
         } 
+    }
+    else
+    {
+    	Point2d inArcDiff = arcsecondPerPixel * inDiff;
+    	speedUpdateTime += dT;
+    	if( speedUpdateTime >= 1.0 )
+    	{
+        	//v_o_out(i) = (p_o_out(i) - p_o_out(i-1) + p_t + (v_t(i)*T))/T;
+        	//v_t(i+1) = v_o_out(i)+((p_o_out(i) - p_t)/T_c);
+    		Point2d speedObject;
+    		speedObject = ((inArcDiff - inArcDiffOld)/speedUpdateTime) + dSpeed);
+    		dSpeed = speedObject;
+    		inArchDiffOld = inArcDiff;
+    		speedUpdateTime = 0.0;
+    	}
     }
             
     Point2i arcsecondsSpeed = static_cast<Point2i>(dSpeed);
