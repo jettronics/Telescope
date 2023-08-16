@@ -42,12 +42,13 @@ private:
    bool trackFlag;
    Point2d inPos, inPosStart;
    Point2d speedObj;
-   Point2d arcsecondsSpeedPredict;
+   Point2d arcsecondsSpeedPredict, dSpeed;
+   Point2d inArcDiffOld;
    bool predictCalc, arcToPixelMeasurement;
    bool manualPos;
    bool manualPos2;   
    int selector;
-   double dt, arcToPixelTime;
+   double dt, arcToPixelTime, speedUpdateTime;
    double dtPos[8];
    struct timespec start, end;
    double normFactor;

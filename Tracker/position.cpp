@@ -271,14 +271,14 @@ void Position::setVariableAzm( int azm )
     {
         waitTurnAzmCount = 0;
         waitTurnAzm = true;
-        cout << "setVariableAzm dir change wait 1" << endl;
+        //cout << "setVariableAzm dir change wait 1" << endl;
     }
     else
     if( ((lastDirVarAzm == 7) && (azm > 0)) && (waitTurnAzm == false) )
     {
         waitTurnAzmCount = 0;
         waitTurnAzm = true;
-        cout << "setVariableAzm dir change wait 2" << endl;
+        //cout << "setVariableAzm dir change wait 2" << endl;
     }
 
     if( waitTurnAzm == true )
@@ -286,7 +286,7 @@ void Position::setVariableAzm( int azm )
         if( waitTurnAzmCount > 8 )
         {
             waitTurnAzm = false;
-            cout << "setVariableAzm dir change allowed" << endl;
+            //cout << "setVariableAzm dir change allowed" << endl;
         }
         else
         {
@@ -339,14 +339,14 @@ void Position::setVariableAlt( int alt )
     {
         waitTurnAltCount = 0;
         waitTurnAlt = true;
-        cout << "setVariableAlt dir change wait 1" << endl;
+        //cout << "setVariableAlt dir change wait 1" << endl;
     }
     else
     if( ((lastDirVarAlt == 7) && (alt > 0)) && (waitTurnAlt == false) )
     {
         waitTurnAltCount = 0;
         waitTurnAlt = true;
-        cout << "setVariableAlt dir change wait 2" << endl;
+        //cout << "setVariableAlt dir change wait 2" << endl;
     }
     
     if( waitTurnAlt == true )
@@ -354,7 +354,7 @@ void Position::setVariableAlt( int alt )
         if( waitTurnAltCount > 8 )
         {
             waitTurnAlt = false;
-            cout << "setVariableAlt dir change allowed" << endl;
+            //cout << "setVariableAlt dir change allowed" << endl;
         }
         else
         {

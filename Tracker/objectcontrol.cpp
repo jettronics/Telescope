@@ -80,6 +80,7 @@ ObjectControl::ObjectControl(Position *position, Position *position2, ProcMessag
     , manualPos2(false)        
     , selector(0)   
     , dt(0.25)
+    , speedUpdateTime(0.0)
     , normFactor(1.0)
 {
     speedFieldOut[0] = 0;
@@ -92,7 +93,9 @@ ObjectControl::ObjectControl(Position *position, Position *position2, ProcMessag
     cycleTimeStart = clock();
     inPos = Point2d(0.0,0.0);
     inPosStart = Point2d(0.0,0.0);
-    speedObj = Point2d(0,0);
+    speedObj = Point2d(0.0,0.0);
+    inArcDiffOld = Point2d(0.0,0.0);
+    dSpeed = Point2d(0.0,0.0);
     clock_gettime(CLOCK_REALTIME, &start);
 }
 
@@ -115,6 +118,10 @@ void ObjectControl::init(double width, double height)
     inPos.y = height * 0.5;
         
     inPosStart = inPos;
+    
+    speedUpdateTime = 0.0;
+    inArcDiffOld = Point2d(0.0,0.0);
+    dSpeed = Point2d(0.0,0.0);
     
 #else
 
@@ -261,8 +268,6 @@ void ObjectControl::controlSpeed()
 {
     Point2d inDiff = inPos - ctrlPos;
     
-    Point2d dSpeed = Point2d(0.0,0.0);
-
     // arcs to pixel measurement
     if( arcToPixelMeasurement == true )
     {
@@ -288,17 +293,29 @@ void ObjectControl::controlSpeed()
     }
     else
     {
-    	Point2d inArcDiff = arcsecondPerPixel * inDiff;
-    	speedUpdateTime += dT;
+        if( initFlag == true )
+        {
+            initFlag = false;
+            inArcDiffOld = Point2d(0.0,0.0);
+            ctrlPos = inPos;
+            inDiff = Point2d(0.0,0.0);
+            dSpeed = Point2d(0.0,0.0);
+        }
+        
+        Point2d inArcDiff = arcsecondPerPixel * inDiff;
+        
+    	speedUpdateTime += dt;
     	if( speedUpdateTime >= 1.0 )
     	{
-        	//v_o_out(i) = (p_o_out(i) - p_o_out(i-1) + p_t + (v_t(i)*T))/T;
-        	//v_t(i+1) = v_o_out(i)+((p_o_out(i) - p_t)/T_c);
+        	//v_o_out(i) = (p_o_out(i) - p_o_out(i-1) + (v_t(i)*T))/T;
+        	//v_t(i+1) = v_o_out(i)+(p_o_out(i)/T_c);
     		Point2d speedObject;
-    		speedObject = ((inArcDiff - inArcDiffOld)/speedUpdateTime) + dSpeed);
-    		dSpeed = speedObject;
-    		inArchDiffOld = inArcDiff;
+    		speedObject = ((inArcDiff - inArcDiffOld)/speedUpdateTime);// + dSpeed;
+    		dSpeed = speedObject + (inArcDiff/5.0);
+    		inArcDiffOld = inArcDiff;
     		speedUpdateTime = 0.0;
+            cout << dec << "inArcDiff = " << inArcDiff << "''/s" << endl;
+            cout << dec << "dSpeed = " << dSpeed << "''/s" << endl;
     	}
     }
             
