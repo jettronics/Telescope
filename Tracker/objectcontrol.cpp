@@ -305,17 +305,17 @@ void ObjectControl::controlSpeed()
         Point2d inArcDiff = arcsecondPerPixel * inDiff;
         
     	speedUpdateTime += dt;
-    	if( speedUpdateTime >= 1.0 )
+    	if( speedUpdateTime >= 2.0 ) //1.0
     	{
         	//v_o_out(i) = (p_o_out(i) - p_o_out(i-1) + (v_t(i)*T))/T;
         	//v_t(i+1) = v_o_out(i)+(p_o_out(i)/T_c);
     		Point2d speedObject;
     		speedObject = ((inArcDiff - inArcDiffOld)/speedUpdateTime);// + dSpeed;
-    		dSpeed = speedObject + (inArcDiff/5.0);
+    		dSpeed = speedObject + (inArcDiff/6.0); //5.0
     		inArcDiffOld = inArcDiff;
     		speedUpdateTime = 0.0;
-            cout << dec << "inArcDiff = " << inArcDiff << "''/s" << endl;
-            cout << dec << "dSpeed = " << dSpeed << "''/s" << endl;
+            //cout << dec << "inArcDiff = " << inArcDiff << "''/s" << endl;
+            //cout << dec << "dSpeed = " << dSpeed << "''/s" << endl;
     	}
     }
             
