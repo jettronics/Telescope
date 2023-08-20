@@ -9,6 +9,9 @@
 #define FOCUS_no
 //#define FOCUS_yes
 
+#define PICTURE_no
+//#define PICTURE_yes
+
 //#define OBJ_CTRL_by_POS
 #define OBJ_CTRL_by_SPEED
 

@@ -47,6 +47,7 @@ private:
    void initRoi(Point2d pnt);
    string getDateAndTime();
    void stopVideoRecord();
+   void dotDetection();
    void sendFocus();
    void calcFocus();
    void changeZoom();
@@ -64,17 +65,16 @@ private:
    bool videoMode;
    int photoStable;
    int cameraState;
-   Mat imageout, imagein, imageshot, imagetrack, imagefocus;
+   Mat imageout, imagein, imageshot, imagetrack, imagefocus, imagegray, imageproc;
    string writeMjpegHeader;
    string writeMjpegContent;
    bool displayByWindow;
-   bool enableTracker;
-   bool initTracker;
-   bool runTracker, runControl;
+   bool enableTracker, initTracker, runTracker, runControl, dotTracker, dotFound;
    bool recordVideo;
    Rect2d roi;
    Point2d roipt;
    Ptr<Tracker> tracker;
+   vector<vector<Point>> contours, contoursLoc;
    ObjectControl *objectControl;
    Scalar roiColor;
    bool enAutoFocus; 
@@ -86,6 +86,7 @@ private:
    double zoomFactor;
    double focusLineLength;
    double roiSize;
+   double dotArea;
    //vector<double> osci1;
    //Ptr<plot::Plot2d> plot1;
 };

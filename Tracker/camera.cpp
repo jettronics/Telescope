@@ -14,6 +14,7 @@
 #include <stdlib.h>
 #include <errno.h>
 #include <fcntl.h>
+#include <vector>
 
 #include <opencv2/opencv.hpp>
 #include <opencv2/tracking.hpp>
@@ -83,6 +84,8 @@ Camera::Camera()
     , initTracker(false)
     , runTracker(false)
     , runControl(false)
+    , dotTracker(true)
+    , dotFound(false)
     , recordVideo(false)
     , roi(0,0,0,0)
     , roipt(0,0)
@@ -96,72 +99,10 @@ Camera::Camera()
     , zoomFactor(1)  
     , focusLineLength(0.0)
     , roiSize(ROI_WIDTH_RATIO)
+    , dotArea(0.0)
 {
     objectControl = new ObjectControl;
 }
-/*
-Camera::Camera(TcpSocketCom *control, TcpSocketCom *stream, Focus *focus, Position *position)
-    : writer(nullptr)
-    , control(control)
-    , stream(stream)
-    , focus(focus)
-    , procMsg(nullptr)
-    , position(position)
-    , videoMode(true)
-    , photoStable(STABLE_PHOTO_SHOT)
-    , cameraState(0)
-    , displayByWindow(false)
-    , enableTracker(false)
-    , initTracker(false)
-    , runTracker(false)
-    , runControl(false)
-    , recordVideo(false)
-    , roi(0,0,0,0)
-    , roipt(0,0)
-    , roiColor(Scalar(255,255,255))
-    , enAutoFocus(false)   
-    , meanFocus(0.0)
-    , drawScale(1.0) 
-    , focusColor(Scalar(0,165,255)) 
-    , focusPos(30)
-    , zoom(0,0,0,0)    
-    , zoomFactor(1)    
-    , focusLineLength(0.0)         
-{
-    objectControl = new ObjectControl(position);
-}
-
-Camera::Camera( TcpSocketCom *control, TcpSocketCom *stream, ProcMessage *proc, Position *position )
-    : writer(nullptr)
-    , control(control)
-    , stream(stream)
-    , focus(nullptr)
-    , procMsg(proc)
-    , position(position)
-    , videoMode(true)
-    , photoStable(STABLE_PHOTO_SHOT)
-    , cameraState(0)
-    , displayByWindow(false)
-    , enableTracker(false)
-    , initTracker(false)
-    , runTracker(false)
-    , runControl(false)
-    , recordVideo(false)
-    , roi(0,0,0,0)
-    , roipt(0,0)
-    , roiColor(Scalar(255,255,255))
-    , enAutoFocus(false)  
-    , meanFocus(0.0)  
-    , drawScale(1.0)
-    , focusColor(Scalar(0,165,255))   
-    , focusPos(30)   
-    , zoom(0,0,0,0)   
-    , zoomFactor(1)   
-    , focusLineLength(0.0)                
-{
-    objectControl = new ObjectControl(position);
-}
-*/
 
 Camera::Camera( TcpSocketCom *control, TcpSocketCom *stream, ProcMessage *proc, ProcMessage *posmsg )
     : writer(nullptr)
@@ -179,6 +120,8 @@ Camera::Camera( TcpSocketCom *control, TcpSocketCom *stream, ProcMessage *proc, 
     , initTracker(false)
     , runTracker(false)
     , runControl(false)
+    , dotTracker(true)
+    , dotFound(false)
     , recordVideo(false)
     , roi(0,0,0,0)
     , roipt(0,0)
@@ -191,7 +134,8 @@ Camera::Camera( TcpSocketCom *control, TcpSocketCom *stream, ProcMessage *proc, 
     , zoom(0,0,0,0)   
     , zoomFactor(1)  
     , focusLineLength(0.0)
-    , roiSize(ROI_WIDTH_RATIO)                      
+    , roiSize(ROI_WIDTH_RATIO)   
+    , dotArea(0.0)
 {
     objectControl = nullptr;
 
@@ -338,12 +282,16 @@ int Camera::process( void )
             if( initTracker == true )
             {
                 cout << "Initialize Tracker" << endl;
-                tracker->init( imagetrack, roi );
+                if( dotTracker == false )
+                {
+                    tracker->init( imagetrack, roi );
+                }
                 runTracker = true;
                 initTracker = false;
                 roiColor = Scalar(0,255,0);
                 roipt.x = ((int)roi.width >> 1) + roi.x;
                 roipt.y = ((int)roi.width >> 1) + roi.y; 
+                dotFound = false;
                 cout << "Run Tracker" << endl;
             }
             if( runTracker == true )
@@ -351,7 +299,14 @@ int Camera::process( void )
                 if( ((roi.x > 20) && ((roi.x + roi.width) < (camProps.widthVideo - 20))) &&
                     ((roi.y > 20) && ((roi.y + roi.height) < (camProps.heightVideo - 20))) )
                 {
-                    tracker->update( imagetrack, roi );
+                    if( dotTracker == false )
+                    {   
+                        tracker->update( imagetrack, roi );
+                    }
+                    else
+                    {
+                        dotDetection();
+                    }
                     roipt.x = ((int)roi.width >> 1) + roi.x;
                     roipt.y = ((int)roi.width >> 1) + roi.y;
                 }
@@ -376,7 +331,7 @@ int Camera::process( void )
                 // Call deinit after roipt reached closed to mid of image and start prediction
                 string strSend = "roipt=" + to_string((int)roipt.x) + "x" + to_string((int)roipt.y) + ";";
                 posMsg->sendClientToServer(strSend);
-                drawMarker( imagetrack, roipt, Scalar( 255, 255, 255 ), MARKER_CROSS, ((int)roi.width >> 2), 2, 1 );
+                //drawMarker( imagetrack, roipt, Scalar( 255, 255, 255 ), MARKER_CROSS, ((int)roi.width >> 2), 2, 1 );
             }
             
 #ifdef FOCUS_yes
@@ -501,6 +456,99 @@ int Camera::process( void )
     return ret;
 }
 
+void Camera::dotDetection()
+{
+    cvtColor(imagetrack(roi), imagegray, CV_RGB2GRAY);
+    threshold(imagegray, imageproc, 0, 255, THRESH_BINARY | THRESH_OTSU);
+    findContours(imageproc, contoursLoc, RETR_LIST, CHAIN_APPROX_SIMPLE);
+    if( contoursLoc.size() > 0 )
+    {
+        contours = contoursLoc;
+        double maxArea = 500.0; //100
+        int dotContourIndex = -1;
+        Point2f dotContour;
+        vector<Point2d> vecDot;
+        vecDot.clear();
+        int dotVecIndex = 0;
+        if( dotFound == false )
+        {
+            dotArea = 0.0;
+            
+            for( size_t i = 0; i < contours.size(); i++ )
+            {
+                double actArea = contourArea(contours[i]);
+                
+                if( actArea < maxArea ) 
+                {
+                    if( actArea > dotArea )
+                    {
+                        //cout << "actArea: " << actArea << ",maxContourIndex: " << i << endl;
+                        dotArea = actArea;
+                        dotContourIndex = (int)i;
+                        float dotRadius;
+                        minEnclosingCircle(	contours[dotContourIndex], dotContour, dotRadius );
+                        Point2d roiDot;
+                        roiDot.x = roi.x + (double)dotContour.x;
+                        roiDot.y = roi.y + (double)dotContour.y;
+                        vecDot.push_back(roiDot);
+                        dotFound = true;
+                    }
+                }
+            }
+        }
+        else
+        {
+            vector<int> vecIndex;
+            vector<double> vecDist;
+            vecIndex.clear();
+            vecDist.clear();
+            for( size_t i = 0; i < contours.size(); i++ )
+            {
+                double actArea = contourArea(contours[i]);
+                                
+                if( (actArea < (dotArea+20.0)) && 
+                    (actArea > (dotArea-20.0)) )
+                {
+                    //cout << "actArea: " << actArea << ",maxContourIndex: " << i << endl;
+                    dotContourIndex = (int)i;
+                    float dotRadius;
+                    minEnclosingCircle(	contours[dotContourIndex], dotContour, dotRadius );
+                    vecIndex.push_back(dotContourIndex);
+                    Point2d roiDot;
+                    roiDot.x = roi.x + (double)dotContour.x;
+                    roiDot.y = roi.y + (double)dotContour.y;
+                    Point2d roiDist = roipt-roiDot;
+                    double squaredSum = (roiDist.x * roiDist.x) + (roiDist.y * roiDist.y);
+                    double dist = sqrt(squaredSum);
+                    cout << "dist: " << dist << endl;
+                    vecDist.push_back(dist);
+                    vecDot.push_back(roiDot);
+                }
+
+            }
+            double roiDist = 1000.0;
+            for( int i = 0; i < vecDist.size(); i++ )
+            {
+                if( vecDist[i] < roiDist )
+                {
+                    dotContourIndex = vecIndex[i];
+                    roiDist = vecDist[i];
+                    dotVecIndex = i;
+                }
+            }
+        }
+        if( dotContourIndex >= 0 )
+        {
+            cout << "dotArea: " << dotArea << endl;
+            drawContours( imagetrack(roi), contours, dotContourIndex, Scalar(0,255,0), 2*drawScale, 1);
+            
+            cout << "roi tracked: " << vecDot[dotVecIndex] << endl;
+        }
+    }
+    
+    return;
+}
+
 void Camera::sendFocus()
 {
     string strSend = "mean=" + to_string(meanFocus) + ";";
@@ -612,27 +660,32 @@ int Camera::setControl( string prop )
         {
             cout << "Position: roi size up" << endl;
             roiSize += 0.01;
-            if( roiSize > 0.25 )
+            if( roiSize > 0.5 )
             {
-                roiSize = 0.25;
+                roiSize = 0.5;
             }
             initRoi(roipt);
-            runTracker = false;
-            initTracker = false;
+            if( dotTracker == false )
+            {
+                runTracker = false;
+                initTracker = false;
+            }
         } 
         
         if( (pos = prop.rfind("Position=roidn")) != string::npos )
         {
             cout << "Position: roi size down" << endl;
-            initRoi(roipt);
             roiSize -= 0.01;
             if( roiSize < 0.01 )
             {
                 roiSize = 0.01;
             }
             initRoi(roipt);
-            runTracker = false;
-            initTracker = false;
+            if( dotTracker == false )
+            {
+                runTracker = false;
+                initTracker = false;
+            }
         } 
     }
     else
@@ -687,6 +740,7 @@ int Camera::setControl( string prop )
     }
     else
 #endif
+#ifdef PICTURE_yes
     if( (pos = prop.rfind("Display")) != string::npos )
     {
         if( (pos = prop.rfind("Display=false")) != string::npos )
@@ -761,6 +815,7 @@ int Camera::setControl( string prop )
         }  
     }
     else
+#endif
     if( (pos = prop.rfind("Tracker")) != string::npos )
     {
         if( (pos = prop.rfind("Tracker=end")) != string::npos )
@@ -814,6 +869,7 @@ int Camera::setControl( string prop )
             {
                 if( runControl == false )
                 {
+                    roiColor = Scalar(255,0,0);
                     runControl = true;
                     string strSend = "init=" + to_string((int)camProps.widthVideo) + "x" + 
                                      to_string((int)camProps.heightVideo) + ";";
@@ -821,10 +877,23 @@ int Camera::setControl( string prop )
                 }
                 else
                 {
+                    roiColor = Scalar(0,255,0);
                     runControl = false;
                     posMsg->sendClientToServer("deInit");
                 }
             }
+        }
+        else
+        if( (pos = prop.rfind("Tracker=kcf")) != string::npos )
+        {
+            cout << "Tracker: kcf" << endl;
+            dotTracker = false;
+        }
+        else
+        if( (pos = prop.rfind("Tracker=dot")) != string::npos )
+        {
+            cout << "Tracker: dot" << endl;
+            dotTracker = true;
         }
     }
     else

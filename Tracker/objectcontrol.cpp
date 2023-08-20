@@ -13,6 +13,7 @@
 
 #ifdef TELESCOPE_8SE
 #define CONTROL_FIXED_RATE 20
+#define CONTROL_EXP_RATE 1.8
 #define SPEED_MAX_LIMIT 200
 #else
 #define CONTROL_FIXED_RATE 40
@@ -489,7 +490,7 @@ int ObjectControl::processMsg()
             position->setFixedAlt( (int)position->getFixedRate() * CONTROL_FIXED_RATE );
             manualPos = true;
 #elif defined(COMM_RS232_no) && defined(COMM_USB_yes)
-            position2->setFixedAlt( pow(position2->getFixedRate(), 1.5) * CONTROL_FIXED_RATE );
+            position2->setFixedAlt( pow(position2->getFixedRate(), CONTROL_EXP_RATE) * CONTROL_FIXED_RATE );
             manualPos2 = true;
 #endif
         }  
@@ -514,7 +515,7 @@ int ObjectControl::processMsg()
             position->setFixedAlt( position->getFixedRate() * (-CONTROL_FIXED_RATE) );
             manualPos = true;
 #elif defined(COMM_RS232_no) && defined(COMM_USB_yes)
-            position2->setFixedAlt( pow(position2->getFixedRate(), 1.5) * (-CONTROL_FIXED_RATE) );
+            position2->setFixedAlt( pow(position2->getFixedRate(), CONTROL_EXP_RATE) * (-CONTROL_FIXED_RATE) );
             manualPos2 = true;
 #endif
         }  
@@ -539,7 +540,7 @@ int ObjectControl::processMsg()
             position->setFixedAzm( position->getFixedRate() * (-CONTROL_FIXED_RATE) );
             manualPos = true;
 #elif defined(COMM_RS232_no) && defined(COMM_USB_yes)
-            position2->setFixedAzm( pow(position2->getFixedRate(), 1.5) * (-CONTROL_FIXED_RATE) );
+            position2->setFixedAzm( pow(position2->getFixedRate(), CONTROL_EXP_RATE) * (-CONTROL_FIXED_RATE) );
             manualPos2 = true;
 #endif
         }  
@@ -564,7 +565,7 @@ int ObjectControl::processMsg()
             position->setFixedAzm( position->getFixedRate() * CONTROL_FIXED_RATE );
             manualPos = true;
 #elif defined(COMM_RS232_no) && defined(COMM_USB_yes)
-            position2->setFixedAzm( pow(position2->getFixedRate(), 1.5) * CONTROL_FIXED_RATE );
+            position2->setFixedAzm( pow(position2->getFixedRate(), CONTROL_EXP_RATE) * CONTROL_FIXED_RATE );
             manualPos2 = true;
 #endif
         }  
