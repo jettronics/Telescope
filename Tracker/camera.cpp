@@ -99,9 +99,12 @@ Camera::Camera()
     , zoomFactor(1)  
     , focusLineLength(0.0)
     , roiSize(ROI_WIDTH_RATIO)
-    , dotArea(0.0)
 {
     objectControl = new ObjectControl;
+    dotTracking.area = 0.0;
+    dotTracking.distance = 0.0;
+    dotTracking.index = 0;
+    dotTracking.pnt = Point2d(0.0,0.0);
 }
 
 Camera::Camera( TcpSocketCom *control, TcpSocketCom *stream, ProcMessage *proc, ProcMessage *posmsg )
@@ -135,9 +138,12 @@ Camera::Camera( TcpSocketCom *control, TcpSocketCom *stream, ProcMessage *proc, 
     , zoomFactor(1)  
     , focusLineLength(0.0)
     , roiSize(ROI_WIDTH_RATIO)   
-    , dotArea(0.0)
 {
     objectControl = nullptr;
+    dotTracking.area = 0.0;
+    dotTracking.distance = 0.0;
+    dotTracking.index = 0;
+    dotTracking.pnt = Point2d(0.0,0.0);
 
 /*        
     osci1.clear();
@@ -205,6 +211,7 @@ int Camera::process( void )
                 cout<<"ROI init"<<endl;
                 roipt.x = camProps.widthVideo / 2;
                 roipt.y = camProps.heightVideo / 2;
+                dotTracking.pnt = roipt;
                 roiColor = Scalar(255,255,255);
             }
             else
@@ -213,6 +220,7 @@ int Camera::process( void )
                 // Calculate roi based on central point
                 roipt.x = roipt.x * camProps.widthVideo / camProps.widthVideoOld;
                 roipt.y = roipt.y * camProps.widthVideo / camProps.widthVideoOld;
+                dotTracking.pnt = roipt;
                 runTracker = false;
                 initTracker = true;
                 roiColor = Scalar(0,255,0);
@@ -302,13 +310,13 @@ int Camera::process( void )
                     if( dotTracker == false )
                     {   
                         tracker->update( imagetrack, roi );
+                        roipt.x = ((int)roi.width >> 1) + roi.x;
+                        roipt.y = ((int)roi.width >> 1) + roi.y;
                     }
                     else
                     {
                         dotDetection();
                     }
-                    roipt.x = ((int)roi.width >> 1) + roi.x;
-                    roipt.y = ((int)roi.width >> 1) + roi.y;
                 }
                 else
                 {
@@ -328,10 +336,19 @@ int Camera::process( void )
             
             if( runControl == true )
             {
-                // Call deinit after roipt reached closed to mid of image and start prediction
-                string strSend = "roipt=" + to_string((int)roipt.x) + "x" + to_string((int)roipt.y) + ";";
-                posMsg->sendClientToServer(strSend);
-                //drawMarker( imagetrack, roipt, Scalar( 255, 255, 255 ), MARKER_CROSS, ((int)roi.width >> 2), 2, 1 );
+                if( dotTracker == false )
+                {
+                    // Call deinit after roipt reached closed to mid of image and start prediction
+                    string strSend = "roipt=" + to_string((int)roipt.x) + "x" + to_string((int)roipt.y) + ";";
+                    posMsg->sendClientToServer(strSend);
+                    //drawMarker( imagetrack, roipt, Scalar( 255, 255, 255 ), MARKER_CROSS, ((int)roi.width >> 2), 2, 1 );
+                }
+                else
+                {
+                    string strSend = "roipt=" + to_string((int)dotTracking.pnt.x) + "x" + to_string((int)dotTracking.pnt.y) + ";";
+                    posMsg->sendClientToServer(strSend);
+                }
+                
             }
             
 #ifdef FOCUS_yes
@@ -467,12 +484,13 @@ void Camera::dotDetection()
         double maxArea = 500.0; //100
         int dotContourIndex = -1;
         Point2f dotContour;
-        vector<Point2d> vecDot;
-        vecDot.clear();
-        int dotVecIndex = 0;
+        
+        vector<DotTrackingType> vecDotTrack;
+        vecDotTrack.clear();
+        
         if( dotFound == false )
         {
-            dotArea = 0.0;
+            dotTracking.area = 0.0;
             
             for( size_t i = 0; i < contours.size(); i++ )
             {
@@ -480,17 +498,17 @@ void Camera::dotDetection()
                 
                 if( actArea < maxArea ) 
                 {
-                    if( actArea > dotArea )
+                    if( actArea > dotTracking.area )
                     {
                         //cout << "actArea: " << actArea << ",maxContourIndex: " << i << endl;
-                        dotArea = actArea;
+                        dotTracking.area = actArea;
                         dotContourIndex = (int)i;
                         float dotRadius;
                         minEnclosingCircle(	contours[dotContourIndex], dotContour, dotRadius );
                         Point2d roiDot;
                         roiDot.x = roi.x + (double)dotContour.x;
                         roiDot.y = roi.y + (double)dotContour.y;
-                        vecDot.push_back(roiDot);
+                        dotTracking.pnt = roiDot;
                         dotFound = true;
                     }
                 }
@@ -498,51 +516,54 @@ void Camera::dotDetection()
         }
         else
         {
-            vector<int> vecIndex;
-            vector<double> vecDist;
-            vecIndex.clear();
-            vecDist.clear();
             for( size_t i = 0; i < contours.size(); i++ )
             {
                 double actArea = contourArea(contours[i]);
+                DotTrackingType dotTrack;
                                 
-                if( (actArea < (dotArea+20.0)) && 
-                    (actArea > (dotArea-20.0)) )
-                {
-                    //cout << "actArea: " << actArea << ",maxContourIndex: " << i << endl;
-                    dotContourIndex = (int)i;
-                    float dotRadius;
-                    minEnclosingCircle(	contours[dotContourIndex], dotContour, dotRadius );
-                    vecIndex.push_back(dotContourIndex);
-                    Point2d roiDot;
-                    roiDot.x = roi.x + (double)dotContour.x;
-                    roiDot.y = roi.y + (double)dotContour.y;
-                    Point2d roiDist = roipt-roiDot;
-                    double squaredSum = (roiDist.x * roiDist.x) + (roiDist.y * roiDist.y);
-                    double dist = sqrt(squaredSum);
-                    cout << "dist: " << dist << endl;
-                    vecDist.push_back(dist);
-                    vecDot.push_back(roiDot);
-                }
-
+                //cout << "actArea: " << actArea << ",maxContourIndex: " << i << endl;
+                dotContourIndex = (int)i;
+                float dotRadius;
+                minEnclosingCircle(	contours[dotContourIndex], dotContour, dotRadius );
+                dotTrack.index = dotContourIndex;
+                Point2d roiDot;
+                roiDot.x = roi.x + (double)dotContour.x;
+                roiDot.y = roi.y + (double)dotContour.y;
+                Point2d roiDist = dotTracking.pnt-roiDot;
+                double squaredSum = (roiDist.x * roiDist.x) + (roiDist.y * roiDist.y);
+                dotTrack.distance = sqrt(squaredSum);
+                //cout << "dist: " << dist << endl;
+                dotTrack.pnt = roiDot;
+                dotTrack.area = actArea;                  
+                vecDotTrack.push_back(dotTrack);
             }
-            double roiDist = 1000.0;
-            for( int i = 0; i < vecDist.size(); i++ )
+            double comb = 1500.0;
+            dotTracking.index = -1;
+            for( int i = 0; i < vecDotTrack.size(); i++ )
             {
-                if( vecDist[i] < roiDist )
+                double diffArea = fabs(dotTracking.area - vecDotTrack[i].area);
+                double minComb = diffArea + vecDotTrack[i].distance;
+                
+                if( minComb < comb )
                 {
-                    dotContourIndex = vecIndex[i];
-                    roiDist = vecDist[i];
-                    dotVecIndex = i;
+                    dotContourIndex = vecDotTrack[i].index;
+                    comb = minComb;
+                    dotTracking.index = i;
                 }
             }
+            if( dotTracking.index >= 0 )
+            {
+                dotTracking.pnt = vecDotTrack[dotTracking.index].pnt;
+            }
+            
         }
         if( dotContourIndex >= 0 )
         {
-            cout << "dotArea: " << dotArea << endl;
+            //cout << "dotArea: " << dotArea << endl;
             drawContours( imagetrack(roi), contours, dotContourIndex, Scalar(0,255,0), 2*drawScale, 1);
             
-            cout << "roi tracked: " << vecDot[dotVecIndex] << endl;
+            //dotTracking.pnt = vecDot[dotVecIndex];
+            //cout << "roi tracked: " << roiptDot << endl;
         }
     }
     

@@ -39,6 +39,9 @@ public:
 
 public:
    int process();
+   
+private:
+   struct DotTrackingType {int index; double distance; double area; Point2d pnt;};
     
 private:
    int setControl( string prop );
@@ -86,7 +89,7 @@ private:
    double zoomFactor;
    double focusLineLength;
    double roiSize;
-   double dotArea;
+   DotTrackingType dotTracking;
    //vector<double> osci1;
    //Ptr<plot::Plot2d> plot1;
 };

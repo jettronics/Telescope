@@ -13,8 +13,8 @@
 
 #ifdef TELESCOPE_8SE
 #define CONTROL_FIXED_RATE 20
-#define CONTROL_EXP_RATE 1.8
-#define SPEED_MAX_LIMIT 200
+#define CONTROL_EXP_RATE 1.9
+#define SPEED_MAX_LIMIT 400
 #else
 #define CONTROL_FIXED_RATE 40
 #define SPEED_MAX_LIMIT 100
@@ -96,6 +96,7 @@ ObjectControl::ObjectControl(Position *position, Position *position2, ProcMessag
     inPosStart = Point2d(0.0,0.0);
     speedObj = Point2d(0.0,0.0);
     inArcDiffOld = Point2d(0.0,0.0);
+    inArcDiff = inArcDiffOld;
     dSpeed = Point2d(0.0,0.0);
     clock_gettime(CLOCK_REALTIME, &start);
 }
@@ -303,7 +304,11 @@ void ObjectControl::controlSpeed()
             dSpeed = Point2d(0.0,0.0);
         }
         
-        Point2d inArcDiff = arcsecondPerPixel * inDiff;
+        Point2d inArcDiffLoc = arcsecondPerPixel * inDiff;
+        // Moving average
+        //double invN = dt / (0.5 + dt);
+        //inArcDiff =  inArcDiff + ((inArcDiffLoc - inArcDiff)*invN);
+        inArcDiff = inArcDiffLoc;
         
     	speedUpdateTime += dt;
     	if( speedUpdateTime >= 2.0 ) //1.0
@@ -315,8 +320,8 @@ void ObjectControl::controlSpeed()
     		dSpeed = speedObject + (inArcDiff/6.0); //5.0
     		inArcDiffOld = inArcDiff;
     		speedUpdateTime = 0.0;
-            //cout << dec << "inArcDiff = " << inArcDiff << "''/s" << endl;
-            //cout << dec << "dSpeed = " << dSpeed << "''/s" << endl;
+            cout << dec << "inArcDiff = " << inArcDiff << "''/s" << endl;
+            cout << dec << "dSpeed = " << dSpeed << "''/s" << endl;
     	}
     }
             

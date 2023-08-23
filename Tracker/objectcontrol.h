@@ -43,7 +43,7 @@ private:
    Point2d inPos, inPosStart;
    Point2d speedObj;
    Point2d arcsecondsSpeedPredict, dSpeed;
-   Point2d inArcDiffOld;
+   Point2d inArcDiff, inArcDiffOld;
    bool predictCalc, arcToPixelMeasurement;
    bool manualPos;
    bool manualPos2;   
