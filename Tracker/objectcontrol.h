@@ -33,7 +33,7 @@ private:
    Point2d ctrlPos;
    double Kp, Td;
    double width, height;
-   double arcsecondPerPixel;
+   Point2d arcsecondPerPixel;
    Point2i arcsecondsSpeedLimitedOld;
    int speedFieldOut[2];
    Point2d deltaInPos[8];
@@ -42,7 +42,7 @@ private:
    bool trackFlag;
    Point2d inPos, inPosStart;
    Point2d speedObj;
-   Point2d arcsecondsSpeedPredict, dSpeed;
+   Point2d arcsecondsSpeedPredict, speedTelescope, speedObject;
    Point2d inArcDiff, inArcDiffOld;
    bool predictCalc, arcToPixelMeasurement;
    bool manualPos;
@@ -52,6 +52,7 @@ private:
    double dtPos[8];
    struct timespec start, end;
    double normFactor;
+   bool speedObjectMeasured;
 };
 
 

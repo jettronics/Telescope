@@ -70,7 +70,7 @@ ObjectControl::ObjectControl(Position *position, Position *position2, ProcMessag
     , Td(0.5) //Object speed -> 8 entries every 0.25s = 2s -> 0.5 1/s
     , width(0)
     , height(0)
-    , arcsecondPerPixel(31.3)
+    , arcsecondPerPixel(31.0,28.9)
     , arcsecondsSpeedLimitedOld(0,0)
     , initFlag(true)
     , trackFlag(false)
@@ -81,8 +81,10 @@ ObjectControl::ObjectControl(Position *position, Position *position2, ProcMessag
     , manualPos2(false)        
     , selector(0)   
     , dt(0.25)
+    , arcToPixelTime(0.0)
     , speedUpdateTime(0.0)
     , normFactor(1.0)
+    , speedObjectMeasured(false)
 {
     speedFieldOut[0] = 0;
     speedFieldOut[1] = 0;
@@ -97,7 +99,8 @@ ObjectControl::ObjectControl(Position *position, Position *position2, ProcMessag
     speedObj = Point2d(0.0,0.0);
     inArcDiffOld = Point2d(0.0,0.0);
     inArcDiff = inArcDiffOld;
-    dSpeed = Point2d(0.0,0.0);
+    speedTelescope = Point2d(0.0,0.0);
+    speedObject = Point2d(0.0,0.0);
     clock_gettime(CLOCK_REALTIME, &start);
 }
 
@@ -123,12 +126,14 @@ void ObjectControl::init(double width, double height)
     
     speedUpdateTime = 0.0;
     inArcDiffOld = Point2d(0.0,0.0);
-    dSpeed = Point2d(0.0,0.0);
+    speedTelescope = Point2d(0.0,0.0);
+    speedObject = Point2d(0.0,0.0);
+    speedObjectMeasured = false;
     
 #else
 
     //arcsecondPerPixel = 9802.0 / height;
-    arcsecondPerPixel = 857.0 / height;
+    arcsecondPerPixel.y = 857.0 / height;
         
     ctrlPos.x = 1143.0 * 0.5;
     ctrlPos.y = 857.0 * 0.5;
@@ -167,7 +172,7 @@ void ObjectControl::deInit()
 
 void ObjectControl::controlPosition()
 {
-	Point2d inPosArc = arcsecondPerPixel * inPos;
+	Point2d inPosArc = arcsecondPerPixel.y * inPos;
 	// Just for testing
 	/*if( inPosArc.x < 2000 )
 	{
@@ -273,7 +278,7 @@ void ObjectControl::controlSpeed()
     // arcs to pixel measurement
     if( arcToPixelMeasurement == true )
     {
-        dSpeed.x = 150.0;
+        speedTelescope.x = 150.0;
         double startMeasure = inPos.x - inPosStart.x;
         if( (fabs(inDiff.x) > 10.0) && (fabs(startMeasure) > 10.0) )
         {
@@ -285,12 +290,12 @@ void ObjectControl::controlSpeed()
             double arcToPixelDistance = (fabs(inPosStart.x)-10.0) - fabs(inPos.x);
             cout << dec << "arcs to pixel time = " << arcToPixelTime << "s" << endl;
             cout << dec << "arcs to pixel distance = " << arcToPixelDistance << "px" << endl;
-            arcsecondPerPixel = (arcToPixelTime / arcToPixelDistance) * dSpeed.x;
-            cout << dec << "arc seconds per pixel = " << arcsecondPerPixel << "arcs/px" << endl;
+            arcsecondPerPixel.x = (arcToPixelTime / arcToPixelDistance) * speedTelescope.x;
+            cout << dec << "arc seconds per pixel = " << arcsecondPerPixel.x << "arcs/px" << endl;
             arcToPixelTime = 0.0;
             arcToPixelDistance = 0.0;
             arcToPixelMeasurement = false;
-            dSpeed = Point2d(0.0,0.0);
+            speedTelescope = Point2d(0.0,0.0);
         } 
     }
     else
@@ -301,31 +306,109 @@ void ObjectControl::controlSpeed()
             inArcDiffOld = Point2d(0.0,0.0);
             ctrlPos = inPos;
             inDiff = Point2d(0.0,0.0);
-            dSpeed = Point2d(0.0,0.0);
+            speedTelescope = Point2d(0.0,0.0);
+            speedObject = Point2d(0.0,0.0);
+            speedUpdateTime = 0.0;
+            speedObjectMeasured = false;
+            cout << "Tracking initialized" << endl;
         }
         
-        Point2d inArcDiffLoc = arcsecondPerPixel * inDiff;
+        inArcDiff.x = arcsecondPerPixel.x * inDiff.x;
+        inArcDiff.y = arcsecondPerPixel.y * inDiff.y;
         // Moving average
         //double invN = dt / (0.5 + dt);
         //inArcDiff =  inArcDiff + ((inArcDiffLoc - inArcDiff)*invN);
-        inArcDiff = inArcDiffLoc;
+        //inArcDiff = inArcDiffLoc;
         
     	speedUpdateTime += dt;
-    	if( speedUpdateTime >= 2.0 ) //1.0
-    	{
-        	//v_o_out(i) = (p_o_out(i) - p_o_out(i-1) + (v_t(i)*T))/T;
-        	//v_t(i+1) = v_o_out(i)+(p_o_out(i)/T_c);
-    		Point2d speedObject;
-    		speedObject = ((inArcDiff - inArcDiffOld)/speedUpdateTime);// + dSpeed;
-    		dSpeed = speedObject + (inArcDiff/6.0); //5.0
-    		inArcDiffOld = inArcDiff;
-    		speedUpdateTime = 0.0;
-            cout << dec << "inArcDiff = " << inArcDiff << "''/s" << endl;
-            cout << dec << "dSpeed = " << dSpeed << "''/s" << endl;
-    	}
+        if( speedObjectMeasured == false )
+        {
+            Point2d distDiffPnt = inArcDiff - inArcDiffOld;
+            double distDiffArc = (distDiffPnt.x * distDiffPnt.x) + (distDiffPnt.y * distDiffPnt.y);
+            distDiffArc = sqrt(distDiffArc);
+            if( distDiffArc > 3000.0 ) //100px
+            {
+                speedObjectMeasured = true;
+                speedObject = ((inArcDiff - inArcDiffOld)/speedUpdateTime);
+                inArcDiffOld = inArcDiff;
+                speedTelescope = speedObject + (inArcDiff/8.0);
+                speedUpdateTime = 0.0;
+                cout << "Object speed measured: " << speedObject << endl;
+                cout << "Telescope speed: " << speedTelescope << endl;
+            }
+        }
+        else
+        {
+            if( speedUpdateTime >= 8.0 ) //1.0
+            {
+                Point2d deltaSpeed = speedObject - speedTelescope;
+                speedObject = deltaSpeed + speedObject;
+
+                //v_o_out(i) = (p_o_out(i) - p_o_out(i-1) + (v_t(i)*T))/T;
+                //v_t(i+1) = v_o_out(i)+(p_o_out(i)/T_c);
+                //speedObject = ((inArcDiff - inArcDiffOld)/speedUpdateTime);// + speedTelescope;
+                //speedTelescope = speedObject + (inArcDiff/6.0); //5.0
+                //inArcDiffOld = inArcDiff;
+                speedUpdateTime = 0.0;
+                //cout << dec << "inArcDiff = " << inArcDiff << "''/s" << endl;
+                cout << "Object speed update: " << speedObject << endl;
+            }
+            Point2d speedTelescopeLoc = speedObject + (inArcDiff/8.0);
+            if( (speedTelescopeLoc.x > 0.0) && (speedTelescope.x < 0.0) )
+            {
+                speedTelescopeLoc.x = -5.0;
+                cout << "Telescope speed limit: " << speedTelescopeLoc << endl;
+            }
+            else
+            if( (speedTelescopeLoc.x < 0.0) && (speedTelescope.x > 0.0) )
+            {
+                speedTelescopeLoc.x = 5.0;
+                cout << "Telescope speed limit: " << speedTelescopeLoc << endl;
+            }
+            else
+            if( fabs(speedTelescopeLoc.x) < 5.0 )
+            {
+                if( speedTelescopeLoc.x > 0.0 )
+                {
+                    speedTelescopeLoc.x = 5.0;
+                }
+                else
+                {
+                    speedTelescopeLoc.x = -5.0;
+                } 
+                cout << "Telescope speed limit: " << speedTelescopeLoc << endl;
+            }
+            
+            if( (speedTelescopeLoc.y > 0.0) && (speedTelescope.y < 0.0) )
+            {
+                speedTelescopeLoc.y = -5.0;
+                cout << "Telescope speed limit: " << speedTelescopeLoc << endl;
+            }
+            else
+            if( (speedTelescopeLoc.x < 0.0) && (speedTelescope.x > 0.0) )
+            {
+                speedTelescopeLoc.y = 5.0;
+                cout << "Telescope speed limit: " << speedTelescopeLoc << endl;
+            }
+            else
+            if( fabs(speedTelescopeLoc.y) < 5.0 )
+            {
+                if( speedTelescopeLoc.y > 0.0 )
+                {
+                    speedTelescopeLoc.y = 5.0;
+                }
+                else
+                {
+                    speedTelescopeLoc.y = -5.0;
+                } 
+                cout << "Telescope speed limit: " << speedTelescopeLoc << endl;
+            }
+            
+            speedTelescope = speedTelescopeLoc;
+        }
     }
             
-    Point2i arcsecondsSpeed = static_cast<Point2i>(dSpeed);
+    Point2i arcsecondsSpeed = static_cast<Point2i>(speedTelescope);
 	arcsecondsSpeed.y = -arcsecondsSpeed.y;
     
     Point2i arcsecondsSpeedLimited;
@@ -339,13 +422,23 @@ void ObjectControl::controlSpeed()
 		position->setVariableAlt(arcsecondsSpeedLimited.y);
 		//cout << dec << "arcsecLim/s = " << arcsecondsSpeedLimited << "''/s" << endl;
 	}
+    else
+    {
+        initFlag = true;
+    }
 #endif
 #ifdef COMM_USB_yes
-	if( manualPos2 == false )
+	/*
+    if( manualPos2 == false )
 	{
 		position2->setVariableAzm(arcsecondsSpeedLimited.x);
 		position2->setVariableAlt(arcsecondsSpeedLimited.y);
 	}
+    else
+    {
+        initFlag = true;
+    }
+    */
 #endif
 
     return;
@@ -433,7 +526,7 @@ int ObjectControl::processMsg()
                         if( trackFlag == false )
                         {
                             inPosStart = inPos;
-                            if( arcsecondPerPixel < 0.1 )
+                            if( arcsecondPerPixel.x < 0.1 )
                             {
                                 arcToPixelMeasurement = true;
                             }

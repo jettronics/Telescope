@@ -679,12 +679,13 @@ int Camera::setControl( string prop )
         
         if( (pos = prop.rfind("Position=roiup")) != string::npos )
         {
-            cout << "Position: roi size up" << endl;
+            
             roiSize += 0.01;
             if( roiSize > 0.5 )
             {
                 roiSize = 0.5;
             }
+            cout << "Position: roi size up: " << roiSize << endl;
             initRoi(roipt);
             if( dotTracker == false )
             {
@@ -695,12 +696,12 @@ int Camera::setControl( string prop )
         
         if( (pos = prop.rfind("Position=roidn")) != string::npos )
         {
-            cout << "Position: roi size down" << endl;
             roiSize -= 0.01;
             if( roiSize < 0.01 )
             {
                 roiSize = 0.01;
             }
+            cout << "Position: roi size down: " << roiSize << endl;
             initRoi(roipt);
             if( dotTracker == false )
             {
