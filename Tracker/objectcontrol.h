@@ -24,6 +24,7 @@ private:
    Point2i speedMax(Point2i speed);
    void measureCycleTime();
    void controlPosition();
+   void controlPositionExt();
    void controlSpeed();
    
 private:
@@ -42,7 +43,7 @@ private:
    bool trackFlag;
    Point2d inPos, inPosStart;
    Point2d speedObj;
-   Point2d arcsecondsSpeedPredict, speedTelescope, speedObject;
+   Point2d arcsecondsSpeedPredict, speedTelescope, speedObject, speedCentre;
    Point2d inArcDiff, inArcDiffOld;
    bool predictCalc, arcToPixelMeasurement;
    bool manualPos;
