@@ -4,6 +4,8 @@
 using namespace std;
 using namespace cv;
 
+#define MEDIAN_FILTER_SIZE  11
+
 class ObjectControl
 {
    
@@ -26,6 +28,7 @@ private:
    void controlPosition();
    void controlPositionExt();
    void controlSpeed();
+   int medianFilter(int *medArr, int in);
    
 private:
    Position *position;
@@ -41,10 +44,10 @@ private:
    bool initFlag;
    clock_t cycleTimeStart;
    bool trackFlag;
-   Point2d inPos, inPosStart;
+   Point2d inPos, inPosStart, inPosOld;
    Point2d speedObj;
    Point2d arcsecondsSpeedPredict, speedTelescope, speedObject, speedCentre;
-   Point2d inArcDiff, inArcDiffOld;
+   Point2d inArcDiff, inArcDiffOld, inDiffOld;
    bool predictCalc, arcToPixelMeasurement;
    bool manualPos;
    bool manualPos2;   
@@ -54,6 +57,8 @@ private:
    struct timespec start, end;
    double normFactor;
    bool speedObjectMeasured;
+   int medianInPosX[MEDIAN_FILTER_SIZE];
+   int medianInPosY[MEDIAN_FILTER_SIZE];
 };
 
 

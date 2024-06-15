@@ -279,6 +279,7 @@ int Camera::process( void )
         // Mirror image y-axis
 #ifdef TELESCOPE_8SE
         flip(imagein, imageout, -1);
+        bitwise_not(imageout, imageout);
 #else
         flip(imagein, imageout, 1);
 #endif
@@ -476,7 +477,8 @@ int Camera::process( void )
 void Camera::dotDetection()
 {
     cvtColor(imagetrack(roi), imagegray, CV_RGB2GRAY);
-    threshold(imagegray, imageproc, 0, 255, THRESH_BINARY | THRESH_OTSU);
+    //threshold(imagegray, imageproc, 0, 255, THRESH_BINARY | THRESH_OTSU);
+    adaptiveThreshold(imagegray, imageproc, 255, ADAPTIVE_THRESH_GAUSSIAN_C, THRESH_BINARY, 21, 2);
     findContours(imageproc, contoursLoc, RETR_LIST, CHAIN_APPROX_SIMPLE);
     if( contoursLoc.size() > 0 )
     {
@@ -539,10 +541,11 @@ void Camera::dotDetection()
             }
             double comb = 1500.0;
             dotTracking.index = -1;
+            double minComb = 0.0;
             for( int i = 0; i < vecDotTrack.size(); i++ )
             {
                 double diffArea = fabs(dotTracking.area - vecDotTrack[i].area);
-                double minComb = diffArea + vecDotTrack[i].distance;
+                minComb = diffArea + vecDotTrack[i].distance;
                 
                 if( minComb < comb )
                 {
@@ -551,9 +554,15 @@ void Camera::dotDetection()
                     dotTracking.index = i;
                 }
             }
+            
             if( dotTracking.index >= 0 )
             {
                 dotTracking.pnt = vecDotTrack[dotTracking.index].pnt;
+            }
+            else
+            {
+                dotTracking.pnt = Point2d(0.0, 0.0);
+                dotFound = false;
             }
             
         }
@@ -564,6 +573,10 @@ void Camera::dotDetection()
             
             //dotTracking.pnt = vecDot[dotVecIndex];
             //cout << "roi tracked: " << roiptDot << endl;
+        }
+        else
+        {
+            dotTracking.pnt = Point2d(0.0, 0.0);
         }
     }
     

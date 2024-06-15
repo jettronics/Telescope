@@ -20,7 +20,6 @@
 #define SPEED_MAX_LIMIT 100
 #endif
 
-
 ObjectControl::ObjectControl()
 {
 
@@ -96,9 +95,11 @@ ObjectControl::ObjectControl(Position *position, Position *position2, ProcMessag
     cycleTimeStart = clock();
     inPos = Point2d(0.0,0.0);
     inPosStart = Point2d(0.0,0.0);
+    inPosOld = Point2d(0.0,0.0);
     speedObj = Point2d(0.0,0.0);
     inArcDiffOld = Point2d(0.0,0.0);
     inArcDiff = inArcDiffOld;
+    inDiffOld = Point2d(0.0,0.0);;
     speedTelescope = Point2d(0.0,0.0);
     speedCentre = Point2d(0.0,0.0);
     speedObject = Point2d(0.0,0.0);
@@ -124,6 +125,7 @@ void ObjectControl::init(double width, double height)
     inPos.y = height * 0.5;
         
     inPosStart = inPos;
+    inPosOld = inPos;
     
     speedUpdateTime = 0.0;
     inArcDiffOld = Point2d(0.0,0.0);
@@ -273,65 +275,145 @@ void ObjectControl::controlPosition()
     return;
 }
 
+int ObjectControl::medianFilter( int *medArr, int in )
+{
+    int out = 0;
+    int sortArr[MEDIAN_FILTER_SIZE];
+    for( int i=0; i<MEDIAN_FILTER_SIZE; i++ )
+	{
+		medArr[(MEDIAN_FILTER_SIZE-1)-i] = medArr[(MEDIAN_FILTER_SIZE-2)-i];
+        sortArr[(MEDIAN_FILTER_SIZE-1)-i] = medArr[(MEDIAN_FILTER_SIZE-1)-i];
+	}
+	medArr[0] = in;
+    sortArr[0] = in;
+    
+    int len = sizeof(sortArr)/sizeof(sortArr[0]);
+    sort( sortArr, sortArr + len );
+    
+    int indArr = (MEDIAN_FILTER_SIZE>>1);
+    //cout << "indArr: " << indArr << endl;
+    /*cout << "sortArr: ";
+    for( int i=0; i<MEDIAN_FILTER_SIZE; i++ )
+    {
+        cout << sortArr[i] << ", ";
+    }
+    cout << endl;
+    */
+    return sortArr[indArr];
+}
 
 void ObjectControl::controlPositionExt()
 {
-    Point2d inDiff = inPos - ctrlPos;
+    Point2d inPosNew;
+    Point2d inDiff;
     
     if( initFlag == true )
     {
         initFlag = false;
         inArcDiffOld = Point2d(0.0,0.0);
         ctrlPos = inPos;
+        inPosOld = inPos;
+        for( int i=0; i<MEDIAN_FILTER_SIZE; i++ )
+        {
+            medianInPosX[i] = inPos.x;
+            medianInPosY[i] = inPos.y;
+        }
         inDiff = Point2d(0.0,0.0);
+        inDiffOld = inDiff;
         speedTelescope = Point2d(0.0,0.0);
         speedObject = Point2d(0.0,0.0);
         speedCentre = Point2d(0.0,0.0);
         speedUpdateTime = 0.0;
         cout << "Tracking initialized" << endl;
     }
-    
-    inArcDiff.x = arcsecondPerPixel.x * inDiff.x;
-    inArcDiff.y = arcsecondPerPixel.y * inDiff.y;
-    
-    speedCentre = 1.0 * inArcDiff;
-    
-    speedUpdateTime += dt;
-    if( speedUpdateTime >= 2.0 ) //1.0
+    else
     {
-        speedObject = (inArcDiff - inArcDiffOld)/speedUpdateTime;
-        inArcDiffOld = inArcDiff;
-        speedUpdateTime = 0.0;
-        cout << "speedObject: " << speedObject << endl;
-        cout << "inArcDiff: " << inArcDiff << endl;
-        cout << "speedCentre: " << speedCentre << endl;
-    }
-	
-	speedTelescope = speedCentre + speedObject;
-    //cout << "Telescope speed update: " << speedTelescope << endl;
-            
-    Point2i arcsecondsSpeed = static_cast<Point2i>(speedTelescope);
-	arcsecondsSpeed.y = -arcsecondsSpeed.y;
-    
-    Point2i arcsecondsSpeedLimited;
-	arcsecondsSpeedLimited = speedMax( arcsecondsSpeed );
+        if( (inPos.x < 1.0) && (inPos.y < 1.0) )
+        {
+            inPosNew = inPosOld;
+        }
+        else
+        {
+            //inPosNew = inPosOld + (0.5 * (inPos - inPosOld));
+            //Try Median
+            //inPosNew.x = medianFilter( medianInPosX, inPos.x);
+            //inPosNew.y = medianFilter( medianInPosY, inPos.y);
+            inPosNew = inPos;
+        }
+        if( manualPos2 == true )
+        {
+            ctrlPos = inPosNew;
+        }
+        inDiff = inPosNew - ctrlPos;
+                
+        inArcDiff.x = arcsecondPerPixel.x * inDiff.x;
+        inArcDiff.y = arcsecondPerPixel.y * inDiff.y;
+        
+        speedCentre = 1.0 * inArcDiff;
+        
+        Point2d diffObject = inPosNew - inPosOld;
+        Point2d diffArcObject;
+        diffArcObject.x = arcsecondPerPixel.x * diffObject.x;
+        diffArcObject.y = arcsecondPerPixel.y * diffObject.y;
+        
+        double diffObjectAbs = (diffArcObject.x * diffArcObject.x) + (diffArcObject.y * diffArcObject.y);
+        diffObjectAbs = sqrt(diffObjectAbs);
+        
+        double diffTelescopeMaxThres = 2.0 * ((double)SPEED_MAX_LIMIT * (double)SPEED_MAX_LIMIT);
+        diffTelescopeMaxThres = sqrt(diffTelescopeMaxThres);
+        diffTelescopeMaxThres *= dt;
+        diffTelescopeMaxThres *= 6.0;
+                
+        if( diffObjectAbs > diffTelescopeMaxThres )
+        {
+            if( manualPos2 == false )        
+            {
+                cout << "Target jump: " << diffObjectAbs << endl;
+                //ctrlPos = inPos - inDiffOld;
+                //return;
+            }
+        }
+        
+        inDiffOld = inDiff;
+        inPosOld = inPosNew;
+        
+        speedUpdateTime += dt;
+        if( speedUpdateTime >= 2.0 ) //1.0
+        {
+            speedObject = (inArcDiff - inArcDiffOld)/speedUpdateTime;
+            inArcDiffOld = inArcDiff;
+            speedUpdateTime = 0.0;
+            cout << "speedObject: " << speedObject << endl;
+            cout << "inDiff: " << inDiff << endl;
+            cout << "diffObjectAbs: " << diffObjectAbs << ", diffTelescopeMaxThres: " << diffTelescopeMaxThres << endl;
+        }
+        
+        speedTelescope = speedCentre + speedObject;
+        //cout << "Telescope speed update: " << speedTelescope << endl;
+                
+        Point2i arcsecondsSpeed = static_cast<Point2i>(speedTelescope);
+        arcsecondsSpeed.y = -arcsecondsSpeed.y;
+        
+        Point2i arcsecondsSpeedLimited;
+        arcsecondsSpeedLimited = speedMax( arcsecondsSpeed );
 
 #ifdef COMM_RS232_yes
-	if( manualPos == false )
-	{
-		position->setVariableAzm(arcsecondsSpeedLimited.x);
-		//cout << dec << "arcsecLim/s = " << arcsecondsSpeedLimited << "''/s" << endl;
-		position->setVariableAlt(arcsecondsSpeedLimited.y);
-		//cout << dec << "arcsecLim/s = " << arcsecondsSpeedLimited << "''/s" << endl;
-	}
+        if( manualPos == false )
+        {
+            position->setVariableAzm(arcsecondsSpeedLimited.x);
+            //cout << dec << "arcsecLim/s = " << arcsecondsSpeedLimited << "''/s" << endl;
+            position->setVariableAlt(arcsecondsSpeedLimited.y);
+            //cout << dec << "arcsecLim/s = " << arcsecondsSpeedLimited << "''/s" << endl;
+        }
 #endif
 #ifdef COMM_USB_yes
-    if( manualPos2 == false )
-	{
-		position2->setVariableAzm(arcsecondsSpeedLimited.x);
-		position2->setVariableAlt(arcsecondsSpeedLimited.y);
-	}
+        if( manualPos2 == false )
+        {
+            position2->setVariableAzm(arcsecondsSpeedLimited.x);
+            position2->setVariableAlt(arcsecondsSpeedLimited.y);
+        }
 #endif
+    }
 
     return;
 }
