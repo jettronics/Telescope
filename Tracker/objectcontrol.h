@@ -4,7 +4,7 @@
 using namespace std;
 using namespace cv;
 
-#define MEDIAN_FILTER_SIZE  11
+#define DT_SAMPLES   8
 
 class ObjectControl
 {
@@ -28,7 +28,6 @@ private:
    void controlPosition();
    void controlPositionExt();
    void controlSpeed();
-   int medianFilter(int *medArr, int in);
    
 private:
    Position *position;
@@ -40,7 +39,7 @@ private:
    Point2d arcsecondPerPixel;
    Point2i arcsecondsSpeedLimitedOld;
    int speedFieldOut[2];
-   Point2d deltaInPos[8];
+   Point2d deltaInPos[DT_SAMPLES];
    bool initFlag;
    clock_t cycleTimeStart;
    bool trackFlag;
@@ -53,12 +52,10 @@ private:
    bool manualPos2;   
    int selector;
    double dt, arcToPixelTime, speedUpdateTime;
-   double dtPos[8];
+   double dtPos[DT_SAMPLES];
    struct timespec start, end;
    double normFactor;
    bool speedObjectMeasured;
-   int medianInPosX[MEDIAN_FILTER_SIZE];
-   int medianInPosY[MEDIAN_FILTER_SIZE];
 };
 
 

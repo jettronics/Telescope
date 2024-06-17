@@ -275,33 +275,6 @@ void ObjectControl::controlPosition()
     return;
 }
 
-int ObjectControl::medianFilter( int *medArr, int in )
-{
-    int out = 0;
-    int sortArr[MEDIAN_FILTER_SIZE];
-    for( int i=0; i<MEDIAN_FILTER_SIZE; i++ )
-	{
-		medArr[(MEDIAN_FILTER_SIZE-1)-i] = medArr[(MEDIAN_FILTER_SIZE-2)-i];
-        sortArr[(MEDIAN_FILTER_SIZE-1)-i] = medArr[(MEDIAN_FILTER_SIZE-1)-i];
-	}
-	medArr[0] = in;
-    sortArr[0] = in;
-    
-    int len = sizeof(sortArr)/sizeof(sortArr[0]);
-    sort( sortArr, sortArr + len );
-    
-    int indArr = (MEDIAN_FILTER_SIZE>>1);
-    //cout << "indArr: " << indArr << endl;
-    /*cout << "sortArr: ";
-    for( int i=0; i<MEDIAN_FILTER_SIZE; i++ )
-    {
-        cout << sortArr[i] << ", ";
-    }
-    cout << endl;
-    */
-    return sortArr[indArr];
-}
-
 void ObjectControl::controlPositionExt()
 {
     Point2d inPosNew;
@@ -311,19 +284,25 @@ void ObjectControl::controlPositionExt()
     {
         initFlag = false;
         inArcDiffOld = Point2d(0.0,0.0);
+        inArcDiff = Point2d(0.0,0.0);
         ctrlPos = inPos;
         inPosOld = inPos;
-        for( int i=0; i<MEDIAN_FILTER_SIZE; i++ )
-        {
-            medianInPosX[i] = inPos.x;
-            medianInPosY[i] = inPos.y;
-        }
         inDiff = Point2d(0.0,0.0);
         inDiffOld = inDiff;
         speedTelescope = Point2d(0.0,0.0);
         speedObject = Point2d(0.0,0.0);
         speedCentre = Point2d(0.0,0.0);
         speedUpdateTime = 0.0;
+        
+        for( int i=0; i<8; i++ )
+		{
+			deltaInPos[i] = inArcDiff;
+		}
+		for( int i=0; i<8; i++ )
+		{
+			dtPos[i] = dt;
+		}
+        
         cout << "Tracking initialized" << endl;
     }
     else
@@ -345,11 +324,6 @@ void ObjectControl::controlPositionExt()
             ctrlPos = inPosNew;
         }
         inDiff = inPosNew - ctrlPos;
-                
-        inArcDiff.x = arcsecondPerPixel.x * inDiff.x;
-        inArcDiff.y = arcsecondPerPixel.y * inDiff.y;
-        
-        speedCentre = 1.0 * inArcDiff;
         
         Point2d diffObject = inPosNew - inPosOld;
         Point2d diffArcObject;
@@ -368,15 +342,41 @@ void ObjectControl::controlPositionExt()
         {
             if( manualPos2 == false )        
             {
-                cout << "Target jump: " << diffObjectAbs << endl;
-                //ctrlPos = inPos - inDiffOld;
-                //return;
+                cout << "Target jump: " << diffObjectAbs << ", diffTelescopeMaxThres: " << diffTelescopeMaxThres << endl;
+                ctrlPos = inPos - inDiffOld;
+                inDiff = inDiffOld;
             }
         }
+                
+        inArcDiff.x = arcsecondPerPixel.x * inDiff.x;
+        inArcDiff.y = arcsecondPerPixel.y * inDiff.y;
         
+        speedCentre = 0.1 * inArcDiff;
+              
         inDiffOld = inDiff;
         inPosOld = inPosNew;
         
+        
+        double dtSum = dt;
+        for( int i=0; i<(DT_SAMPLES-1); i++ )
+        {
+           dtPos[(DT_SAMPLES-1)-i] = dtPos[(DT_SAMPLES-2)-i];
+           dtSum += dtPos[(DT_SAMPLES-2)-i];
+        }
+        dtPos[0] = dt;
+        speedUpdateTime = dtSum;
+
+        for( int i=0; i<(DT_SAMPLES-1); i++ )
+        {
+            deltaInPos[(DT_SAMPLES-1)-i] = deltaInPos[(DT_SAMPLES-2)-i];
+        }
+        deltaInPos[0] = inArcDiff;
+        inArcDiffOld = deltaInPos[7];
+
+        speedObject = (inArcDiff - inArcDiffOld)/speedUpdateTime;
+
+#if 0     
+        ----
         speedUpdateTime += dt;
         if( speedUpdateTime >= 2.0 ) //1.0
         {
@@ -387,6 +387,7 @@ void ObjectControl::controlPositionExt()
             cout << "inDiff: " << inDiff << endl;
             cout << "diffObjectAbs: " << diffObjectAbs << ", diffTelescopeMaxThres: " << diffTelescopeMaxThres << endl;
         }
+#endif
         
         speedTelescope = speedCentre + speedObject;
         //cout << "Telescope speed update: " << speedTelescope << endl;

@@ -515,6 +515,14 @@ void Camera::dotDetection()
                     }
                 }
             }
+            if( dotFound == true )
+            {
+                for( int i=0; i<MEDIAN_FILTER_SIZE; i++ )
+                {
+                    medianInPosX[i] = dotTracking.pnt.x;
+                    medianInPosY[i] = dotTracking.pnt.y;
+                }
+            }
         }
         else
         {
@@ -570,6 +578,10 @@ void Camera::dotDetection()
         {
             //cout << "dotArea: " << dotArea << endl;
             drawContours( imagetrack(roi), contours, dotContourIndex, Scalar(0,255,0), 2*drawScale, 1);
+            
+            dotTracking.pnt.x = medianFilter( medianInPosX, dotTracking.pnt.x );
+            dotTracking.pnt.y = medianFilter( medianInPosY, dotTracking.pnt.y );
+            drawMarker( imagetrack, dotTracking.pnt, roiColor, MARKER_CROSS, (int)(50.0*drawScale), 2, 1 );
             
             //dotTracking.pnt = vecDot[dotVecIndex];
             //cout << "roi tracked: " << roiptDot << endl;
@@ -1036,6 +1048,34 @@ void Camera::changeZoom()
     //focusLineLength = 100.0 * drawScale / zoomFactor;
     focusLineLength = 5.0 * drawScale / zoomFactor;
 }
+
+int Camera::medianFilter( int *medArr, int in )
+{
+    int out = 0;
+    int sortArr[MEDIAN_FILTER_SIZE];
+    for( int i=0; i<MEDIAN_FILTER_SIZE; i++ )
+	{
+		medArr[(MEDIAN_FILTER_SIZE-1)-i] = medArr[(MEDIAN_FILTER_SIZE-2)-i];
+        sortArr[(MEDIAN_FILTER_SIZE-1)-i] = medArr[(MEDIAN_FILTER_SIZE-1)-i];
+	}
+	medArr[0] = in;
+    sortArr[0] = in;
+    
+    int len = sizeof(sortArr)/sizeof(sortArr[0]);
+    sort( sortArr, sortArr + len );
+    
+    int indArr = (MEDIAN_FILTER_SIZE>>1);
+    //cout << "indArr: " << indArr << endl;
+    /*cout << "sortArr: ";
+    for( int i=0; i<MEDIAN_FILTER_SIZE; i++ )
+    {
+        cout << sortArr[i] << ", ";
+    }
+    cout << endl;
+    */
+    return sortArr[indArr];
+}
+
 
 string Camera::getDateAndTime()
 {

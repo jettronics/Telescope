@@ -4,6 +4,8 @@
 using namespace std;
 using namespace cv;
 
+#define MEDIAN_FILTER_SIZE  11
+
 class CameraProperties
 {
 public:
@@ -54,6 +56,7 @@ private:
    void sendFocus();
    void calcFocus();
    void changeZoom();
+   int medianFilter(int *medArr, int in);
     
 private:
    CameraProperties camProps;
@@ -90,6 +93,8 @@ private:
    double focusLineLength;
    double roiSize;
    DotTrackingType dotTracking;
+   int medianInPosX[MEDIAN_FILTER_SIZE];
+   int medianInPosY[MEDIAN_FILTER_SIZE];
    //vector<double> osci1;
    //Ptr<plot::Plot2d> plot1;
 };
