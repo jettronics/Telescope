@@ -57,6 +57,7 @@ private:
    void calcFocus();
    void changeZoom();
    int medianFilter(int *medArr, int in);
+   int handleJoystickEvents(string *msgEvents);
     
 private:
    CameraProperties camProps;
@@ -95,6 +96,10 @@ private:
    DotTrackingType dotTracking;
    int medianInPosX[MEDIAN_FILTER_SIZE];
    int medianInPosY[MEDIAN_FILTER_SIZE];
+   int joystHndl;
+   struct js_event joystEvent;
+   int joystVertState, joystHorState;
+   int joystPosSpeed;
    //vector<double> osci1;
    //Ptr<plot::Plot2d> plot1;
 };

@@ -21,6 +21,7 @@
 #include <opencv2/plot.hpp>
 #include <raspicam/raspicam_cv.h>
 #include <raspicam/raspicam.h>
+#include <linux/joystick.h>
 
 #include "setup.h"
 #include "tcpsocketcom.h"
@@ -99,6 +100,10 @@ Camera::Camera()
     , zoomFactor(1)  
     , focusLineLength(0.0)
     , roiSize(ROI_WIDTH_RATIO)
+    , joystHndl(-1)
+    , joystVertState(0)
+    , joystHorState(0)
+    , joystPosSpeed(1)
 {
     objectControl = new ObjectControl;
     dotTracking.area = 0.0;
@@ -137,7 +142,11 @@ Camera::Camera( TcpSocketCom *control, TcpSocketCom *stream, ProcMessage *proc, 
     , zoom(0,0,0,0)   
     , zoomFactor(1)  
     , focusLineLength(0.0)
-    , roiSize(ROI_WIDTH_RATIO)   
+    , roiSize(ROI_WIDTH_RATIO)  
+    , joystHndl(-1)
+    , joystVertState(0)
+    , joystHorState(0)
+    , joystPosSpeed(1)
 {
     objectControl = nullptr;
     dotTracking.area = 0.0;
@@ -177,10 +186,160 @@ Camera::~Camera()
     }
 }
 
+int Camera::handleJoystickEvents(string *msgEvents)
+{
+    int ret = -1;
+    
+    if( joystHndl >= 0 )
+    {
+        ssize_t bytes;
+
+        bytes = read(joystHndl, &joystEvent, sizeof(joystEvent));
+
+        if (bytes == sizeof(joystEvent))
+        {
+            ret = 0;
+            if( joystEvent.type == JS_EVENT_BUTTON )
+            {
+                cout << "Joystick Button: " << (int)joystEvent.number << ", State: " << joystEvent.value << endl;
+            }
+            else
+            if( joystEvent.type == JS_EVENT_AXIS )
+            {
+                //cout << "Joystick Axis: " << (int)joystEvent.number << ", State: " << joystEvent.value << endl;
+                if( ((int)joystEvent.number == 0) && ((int)joystEvent.value != 0) )
+                {
+                    if( joystHorState != 0 )
+                    {
+                        // Increase Speed
+                        joystPosSpeed++;
+                        if( joystPosSpeed > 9 )
+                        {
+                            joystPosSpeed = 9;
+                        }
+                        string posStr = "Positionspeed=" + to_string(joystPosSpeed) + ";";
+                        (*msgEvents) += posStr;
+                    }
+                                        
+                    // Left, Right
+                    if( joystEvent.value > 0 )
+                    {
+                        if( (joystHorState != joystEvent.value) && (joystHorState != 0) )
+                        {
+                            // Stop
+                            //"Position=stoplr"
+                            joystHorState = 0;
+                            cout << "Position Horizontal stop" << endl;
+                        }
+                        else
+                        {
+                            // Right
+                            //"Position=right"
+                            joystHorState = joystEvent.value;
+                            cout << "Position right" << endl;
+                        }
+                    }
+                    else
+                    if( joystEvent.value < 0 )
+                    {
+                        if( (joystHorState != joystEvent.value) && (joystHorState != 0) )
+                        {
+                            // Stop
+                            //"Position=stoplr"
+                            joystHorState = 0;
+                            cout << "Position Horizontal stop" << endl;
+                        }
+                        else
+                        {
+                            // Left
+                            //"Position=left"
+                            joystHorState = joystEvent.value;
+                            cout << "Position left" << endl;
+                        }
+                    }
+                    
+                    if( (joystVertState == 0) && (joystHorState == 0) )
+                    {
+                        joystPosSpeed = 1;
+                        string posStr = "Positionspeed=" + to_string(joystPosSpeed) + ";";
+                        (*msgEvents) += posStr;
+                    }
+                    
+                    cout << "Position speed: " << joystPosSpeed << endl;
+                }
+                else
+                if( ((int)joystEvent.number == 1) && ((int)joystEvent.value != 0) )
+                {
+                    if( joystVertState != 0 )
+                    {
+                        // Increase Speed
+                        joystPosSpeed++;
+                        if( joystPosSpeed > 9 )
+                        {
+                            joystPosSpeed = 9;
+                        }
+                        string posStr = "Positionspeed=" + to_string(joystPosSpeed) + ";";
+                        (*msgEvents) += posStr;
+                    }
+                    
+                    // Up, Down
+                    if( joystEvent.value > 0 )
+                    {
+                        if( (joystVertState != joystEvent.value) && (joystVertState != 0) )
+                        {
+                            // Stop
+                            //"Position=stopud"
+                            joystVertState = 0;
+                            cout << "Position Vertical stop" << endl;
+                        }
+                        else
+                        {
+                            // Down
+                            //"Position=down"
+                            joystVertState = joystEvent.value;
+                            cout << "Position down" << endl;
+                        }
+                    }
+                    else
+                    if( joystEvent.value < 0 )
+                    {
+                        if( (joystVertState != joystEvent.value) && (joystVertState != 0) )
+                        {
+                            // Stop
+                            //"Position=stopud"
+                            joystVertState = 0;
+                            cout << "Position Vertical stop" << endl;
+                        }
+                        else
+                        {
+                            // Up
+                            joystVertState = joystEvent.value;
+                            //"Position=up"
+                            cout << "Position up" << endl;
+                        }
+                    }
+                    
+                    if( (joystVertState == 0) && (joystHorState == 0) )
+                    {
+                        joystPosSpeed = 1;
+                        string posStr = "Positionspeed=" + to_string(joystPosSpeed) + ";";
+                        (*msgEvents) += posStr;
+                    }
+                    
+                    cout << "Position speed: " << joystPosSpeed << endl;
+                }
+            }
+        }
+    }
+    
+    return ret;
+}
+
 
 int Camera::process( void )
 {
     int ret = 0;
+    
     if( cameraState == 0 )
     { 
         cout << "Initializing ..." << endl;
@@ -202,6 +361,12 @@ int Camera::process( void )
         cam.set( CV_CAP_PROP_SATURATION, camProps.saturation );
 	 	cam.set( CV_CAP_PROP_GAIN, camProps.gain );
         cam.set( CV_CAP_PROP_EXPOSURE, camProps.exposure );
+        
+        joystHndl = open("/dev/input/js0", O_RDONLY | O_NONBLOCK);
+        cout << "Open Joystick: " << joystHndl << endl;
+        joystVertState = 0;
+        joystHorState = 0;
+        joystPosSpeed = 1;
         
         if( videoMode == true )
         {
@@ -400,11 +565,19 @@ int Camera::process( void )
             }
             //#endif
         }
+        
         c = (char)waitKey(OPENCV_WAIT_FOR_KEY);
         
         string recData = control->getData();
+        handleJoystickEvents(&recData);
+        
         if( recData != "Empty" )
         {
+            size_t found = recData.find("Empty");
+            if( found != string::npos )
+            {
+                recData.erase(found, 5);
+            }
             cout << "\nData received: " << recData << endl;
             retCtrl = setControl(recData); 
             cout.flush();                                                

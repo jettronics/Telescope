@@ -17,6 +17,7 @@
 #include <opencv2/plot.hpp>
 #include <raspicam/raspicam_cv.h>
 #include <raspicam/raspicam.h>
+#include <linux/joystick.h>
 
 #include "setup.h"
 #include "tcpsocketcom.h"
