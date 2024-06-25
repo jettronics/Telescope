@@ -100,6 +100,8 @@ private:
    struct js_event joystEvent;
    int joystVertState, joystHorState;
    int joystPosSpeed;
+   int joystButtonXState;
+   int joystButtonSelectState;
    //vector<double> osci1;
    //Ptr<plot::Plot2d> plot1;
 };

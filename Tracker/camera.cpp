@@ -104,6 +104,8 @@ Camera::Camera()
     , joystVertState(0)
     , joystHorState(0)
     , joystPosSpeed(1)
+    , joystButtonXState(0)
+    , joystButtonSelectState(0)
 {
     objectControl = new ObjectControl;
     dotTracking.area = 0.0;
@@ -147,6 +149,8 @@ Camera::Camera( TcpSocketCom *control, TcpSocketCom *stream, ProcMessage *proc, 
     , joystVertState(0)
     , joystHorState(0)
     , joystPosSpeed(1)
+    , joystButtonXState(0)
+    , joystButtonSelectState(0)
 {
     objectControl = nullptr;
     dotTracking.area = 0.0;
@@ -201,7 +205,69 @@ int Camera::handleJoystickEvents(string *msgEvents)
             ret = 0;
             if( joystEvent.type == JS_EVENT_BUTTON )
             {
-                cout << "Joystick Button: " << (int)joystEvent.number << ", State: " << joystEvent.value << endl;
+                //cout << "Joystick Button: " << (int)joystEvent.number << ", State: " << joystEvent.value << endl;
+                if( ((int)joystEvent.number == 0) && ((int)joystEvent.value != 0) ) 
+                {
+                    // Button X -> ROI on/off
+                    if( joystButtonXState == 0 )
+                    {
+                        joystButtonXState = 1;
+                        string posStr = "Tracker=init;";
+                        (*msgEvents) += posStr;
+                    }
+                    else
+                    {
+                        joystButtonXState = 0;
+                        string posStr = "Tracker=deinit;";
+                        (*msgEvents) += posStr;
+                    }
+                    cout << "Button X -> ROI state: " << joystButtonXState << endl;
+                }
+                else
+                if( ((int)joystEvent.number == 1) && ((int)joystEvent.value != 0) ) 
+                {
+                    // Button A -> ROI size up
+                    string posStr = "Position=roiup;";
+                    (*msgEvents) += posStr;
+                    cout << "Button A -> ROI size up" << endl;
+                }
+                else
+                if( ((int)joystEvent.number == 2) && ((int)joystEvent.value != 0) ) 
+                {
+                    // Button A -> ROI size up
+                    string posStr = "Position=roidn;";
+                    (*msgEvents) += posStr;
+                    cout << "Button B -> ROI size down" << endl;
+                }
+                else
+                if( ((int)joystEvent.number == 8) && ((int)joystEvent.value != 0) ) 
+                {
+                    // Button Select -> Find Object
+                    // Button X -> ROI on/off
+                    if( joystButtonSelectState == 0 )
+                    {
+                        joystButtonSelectState = 1;
+                        string posStr = "Tracker=run;";
+                        (*msgEvents) += posStr;
+                    }
+                    else
+                    {
+                        joystButtonSelectState = 0;
+                        string posStr = "Tracker=stop;";
+                        (*msgEvents) += posStr;
+                    }
+                    
+                    cout << "Button Select -> Object state: " << joystButtonSelectState << endl;
+                }
+                else
+                if( ((int)joystEvent.number == 9) && ((int)joystEvent.value != 0) ) 
+                {
+                    // Button Start -> Tracking Start/Stop
+                    string posStr = "Tracker=ctrl;";
+                    (*msgEvents) += posStr;
+                    
+                    cout << "Button Start -> Tracker control" << endl;
+                }
             }
             else
             if( joystEvent.type == JS_EVENT_AXIS )
@@ -227,15 +293,17 @@ int Camera::handleJoystickEvents(string *msgEvents)
                         if( (joystHorState != joystEvent.value) && (joystHorState != 0) )
                         {
                             // Stop
-                            //"Position=stoplr"
                             joystHorState = 0;
+                            string posStr = "Position=stoplr;";
+                            (*msgEvents) += posStr;
                             cout << "Position Horizontal stop" << endl;
                         }
                         else
                         {
                             // Right
-                            //"Position=right"
                             joystHorState = joystEvent.value;
+                            string posStr = "Position=right;";
+                            (*msgEvents) += posStr;
                             cout << "Position right" << endl;
                         }
                     }
@@ -245,15 +313,17 @@ int Camera::handleJoystickEvents(string *msgEvents)
                         if( (joystHorState != joystEvent.value) && (joystHorState != 0) )
                         {
                             // Stop
-                            //"Position=stoplr"
                             joystHorState = 0;
+                            string posStr = "Position=stoplr;";
+                            (*msgEvents) += posStr;
                             cout << "Position Horizontal stop" << endl;
                         }
                         else
                         {
                             // Left
-                            //"Position=left"
                             joystHorState = joystEvent.value;
+                            string posStr = "Position=left;";
+                            (*msgEvents) += posStr;
                             cout << "Position left" << endl;
                         }
                     }
@@ -288,15 +358,17 @@ int Camera::handleJoystickEvents(string *msgEvents)
                         if( (joystVertState != joystEvent.value) && (joystVertState != 0) )
                         {
                             // Stop
-                            //"Position=stopud"
                             joystVertState = 0;
+                            string posStr = "Position=stopud;";
+                            (*msgEvents) += posStr;
                             cout << "Position Vertical stop" << endl;
                         }
                         else
                         {
                             // Down
-                            //"Position=down"
                             joystVertState = joystEvent.value;
+                            string posStr = "Position=down;";
+                            (*msgEvents) += posStr;
                             cout << "Position down" << endl;
                         }
                     }
@@ -306,15 +378,17 @@ int Camera::handleJoystickEvents(string *msgEvents)
                         if( (joystVertState != joystEvent.value) && (joystVertState != 0) )
                         {
                             // Stop
-                            //"Position=stopud"
                             joystVertState = 0;
+                            string posStr = "Position=stopud;";
+                            (*msgEvents) += posStr;
                             cout << "Position Vertical stop" << endl;
                         }
                         else
                         {
                             // Up
                             joystVertState = joystEvent.value;
-                            //"Position=up"
+                            string posStr = "Position=up;";
+                            (*msgEvents) += posStr;
                             cout << "Position up" << endl;
                         }
                     }
@@ -367,6 +441,8 @@ int Camera::process( void )
         joystVertState = 0;
         joystHorState = 0;
         joystPosSpeed = 1;
+        joystButtonXState = 0;
+        joystButtonSelectState = 0;
         
         if( videoMode == true )
         {

@@ -730,7 +730,7 @@ int ObjectControl::processMsg()
             position2->setFixedRate( (char)stoi(sub) );
 #endif
         }  
-        else
+        
         if( (pos = rec.rfind("alt=1")) != string::npos )
         {
             cout << "alt=1" << endl;
@@ -830,7 +830,7 @@ int ObjectControl::processMsg()
             manualPos2 = true;
 #endif
         }  
-        else
+        
         if( (pos = rec.rfind("alt=0")) != string::npos )
         {
             cout << "alt=0" << endl;
@@ -880,7 +880,7 @@ int ObjectControl::processMsg()
             manualPos2 = false;
 #endif
         }  
-        else
+        
         if( (pos = rec.find("exit")) != string::npos )
         {
             deInit();
