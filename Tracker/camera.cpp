@@ -279,9 +279,9 @@ int Camera::handleJoystickEvents(string *msgEvents)
                     {
                         // Increase Speed
                         joystPosSpeed++;
-                        if( joystPosSpeed > 9 )
+                        if( joystPosSpeed > 10 )
                         {
-                            joystPosSpeed = 9;
+                            joystPosSpeed = 10;
                         }
                         string posStr = "Positionspeed=" + to_string(joystPosSpeed) + ";";
                         (*msgEvents) += posStr;
@@ -344,9 +344,9 @@ int Camera::handleJoystickEvents(string *msgEvents)
                     {
                         // Increase Speed
                         joystPosSpeed++;
-                        if( joystPosSpeed > 9 )
+                        if( joystPosSpeed > 10 )
                         {
-                            joystPosSpeed = 9;
+                            joystPosSpeed = 10;
                         }
                         string posStr = "Positionspeed=" + to_string(joystPosSpeed) + ";";
                         (*msgEvents) += posStr;
@@ -520,7 +520,7 @@ int Camera::process( void )
         // Mirror image y-axis
 #ifdef TELESCOPE_8SE
         flip(imagein, imageout, -1);
-        bitwise_not(imageout, imageout);
+        //bitwise_not(imageout, imageout);
 #else
         flip(imagein, imageout, 1);
 #endif
