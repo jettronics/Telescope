@@ -18,6 +18,10 @@ public:
    void setFixedAlt( int alt );
    void setFixedRate( char rate ) { fixedRate = rate; }
    char getFixedRate() { return fixedRate; }
+   void setFixedRateAzm( char rate ) { fixedRateAzm = rate; }
+   char getFixedRateAzm() { return fixedRateAzm; }
+   void setFixedRateAlt( char rate ) { fixedRateAlt = rate; }
+   char getFixedRateAlt() { return fixedRateAlt; }
    void setVariableAzm( int azm );
    void setVariableAlt( int alt );
    
@@ -28,6 +32,8 @@ protected:
    char arrBufAlt[8];
    char arrBufAzm[8];
    char fixedRate;
+   char fixedRateAlt;
+   char fixedRateAzm;
    char lastDirVarAzm;
    char lastDirVarAlt;
    char lastDirFixAzm;

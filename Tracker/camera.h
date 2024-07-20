@@ -99,7 +99,7 @@ private:
    int joystHndl;
    struct js_event joystEvent;
    int joystVertState, joystHorState;
-   int joystPosSpeed;
+   int joystPosSpeedY, joystPosSpeedX;
    int joystButtonXState;
    int joystButtonSelectState;
    //vector<double> osci1;

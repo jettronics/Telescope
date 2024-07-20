@@ -19,6 +19,8 @@
 Position::Position()
     : filestream(-1)
     , fixedRate(1)
+    , fixedRateAzm(1)
+    , fixedRateAlt(1)
     , lastDirVarAzm(6)
     , lastDirVarAlt(6)
     , lastDirFixAzm(36)

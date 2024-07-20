@@ -103,7 +103,8 @@ Camera::Camera()
     , joystHndl(-1)
     , joystVertState(0)
     , joystHorState(0)
-    , joystPosSpeed(1)
+    , joystPosSpeedY(1)
+    , joystPosSpeedX(1)
     , joystButtonXState(0)
     , joystButtonSelectState(0)
 {
@@ -148,7 +149,8 @@ Camera::Camera( TcpSocketCom *control, TcpSocketCom *stream, ProcMessage *proc, 
     , joystHndl(-1)
     , joystVertState(0)
     , joystHorState(0)
-    , joystPosSpeed(1)
+    , joystPosSpeedY(1)
+    , joystPosSpeedX(1)
     , joystButtonXState(0)
     , joystButtonSelectState(0)
 {
@@ -234,16 +236,29 @@ int Camera::handleJoystickEvents(string *msgEvents)
                 else
                 if( ((int)joystEvent.number == 2) && ((int)joystEvent.value != 0) ) 
                 {
-                    // Button A -> ROI size up
+                    // Button B -> ROI size down
                     string posStr = "Position=roidn;";
                     (*msgEvents) += posStr;
                     cout << "Button B -> ROI size down" << endl;
                 }
                 else
+                if( ((int)joystEvent.number == 3) && ((int)joystEvent.value != 0) ) 
+                {
+                    // Button Y -> Stop all axis
+                    joystHorState = 0;
+                    joystVertState = 0;
+                    joystPosSpeedX = 1;
+                    joystPosSpeedY = 1;
+                    string pos1Str = "Position=stoplr;";
+                    (*msgEvents) += pos1Str;
+                    string pos2Str = "Position=stopud;";
+                    (*msgEvents) += pos2Str;
+                    cout << "Position Horizontal and Vertical stop" << endl;
+                }
+                else
                 if( ((int)joystEvent.number == 8) && ((int)joystEvent.value != 0) ) 
                 {
                     // Button Select -> Find Object
-                    // Button X -> ROI on/off
                     if( joystButtonSelectState == 0 )
                     {
                         joystButtonSelectState = 1;
@@ -278,12 +293,12 @@ int Camera::handleJoystickEvents(string *msgEvents)
                     if( joystHorState != 0 )
                     {
                         // Increase Speed
-                        joystPosSpeed++;
-                        if( joystPosSpeed > 10 )
+                        joystPosSpeedX++;
+                        if( joystPosSpeedX > 15 )
                         {
-                            joystPosSpeed = 10;
+                            joystPosSpeedX = 15;
                         }
-                        string posStr = "Positionspeed=" + to_string(joystPosSpeed) + ";";
+                        string posStr = "PositionspeedX=" + to_string(joystPosSpeedX) + ";";
                         (*msgEvents) += posStr;
                     }
                                         
@@ -328,14 +343,14 @@ int Camera::handleJoystickEvents(string *msgEvents)
                         }
                     }
                     
-                    if( (joystVertState == 0) && (joystHorState == 0) )
+                    if( joystHorState == 0 )
                     {
-                        joystPosSpeed = 1;
-                        string posStr = "Positionspeed=" + to_string(joystPosSpeed) + ";";
+                        joystPosSpeedX = 1;
+                        string posStr = "PositionspeedX=" + to_string(joystPosSpeedX) + ";";
                         (*msgEvents) += posStr;
                     }
                     
-                    cout << "Position speed: " << joystPosSpeed << endl;
+                    cout << "Horizontal speed: " << joystPosSpeedX << endl;
                 }
                 else
                 if( ((int)joystEvent.number == 1) && ((int)joystEvent.value != 0) )
@@ -343,12 +358,12 @@ int Camera::handleJoystickEvents(string *msgEvents)
                     if( joystVertState != 0 )
                     {
                         // Increase Speed
-                        joystPosSpeed++;
-                        if( joystPosSpeed > 10 )
+                        joystPosSpeedY++;
+                        if( joystPosSpeedY > 15 )
                         {
-                            joystPosSpeed = 10;
+                            joystPosSpeedY = 15;
                         }
-                        string posStr = "Positionspeed=" + to_string(joystPosSpeed) + ";";
+                        string posStr = "PositionspeedY=" + to_string(joystPosSpeedY) + ";";
                         (*msgEvents) += posStr;
                     }
                     
@@ -393,14 +408,14 @@ int Camera::handleJoystickEvents(string *msgEvents)
                         }
                     }
                     
-                    if( (joystVertState == 0) && (joystHorState == 0) )
+                    if( joystVertState == 0 )
                     {
-                        joystPosSpeed = 1;
-                        string posStr = "Positionspeed=" + to_string(joystPosSpeed) + ";";
+                        joystPosSpeedY = 1;
+                        string posStr = "PositionspeedY=" + to_string(joystPosSpeedY) + ";";
                         (*msgEvents) += posStr;
                     }
                     
-                    cout << "Position speed: " << joystPosSpeed << endl;
+                    cout << "Vertical speed: " << joystPosSpeedY << endl;
                 }
             }
         }
@@ -440,7 +455,8 @@ int Camera::process( void )
         cout << "Open Joystick: " << joystHndl << endl;
         joystVertState = 0;
         joystHorState = 0;
-        joystPosSpeed = 1;
+        joystPosSpeedX = 1;
+        joystPosSpeedY = 1;
         joystButtonXState = 0;
         joystButtonSelectState = 0;
         
@@ -519,7 +535,8 @@ int Camera::process( void )
         cam.retrieve(imagein);
         // Mirror image y-axis
 #ifdef TELESCOPE_8SE
-        flip(imagein, imageout, -1);
+        //flip(imagein, imageout, -1);
+        imageout = imagein.clone();
         //bitwise_not(imageout, imageout);
 #else
         flip(imagein, imageout, 1);
@@ -732,7 +749,7 @@ void Camera::dotDetection()
     if( contoursLoc.size() > 0 )
     {
         contours = contoursLoc;
-        double maxArea = 500.0; //100
+        double maxArea = 30000.0; //500.0
         int dotContourIndex = -1;
         Point2f dotContour;
         
@@ -907,7 +924,25 @@ int Camera::setControl( string prop )
             //position->setFixedRate( (char)stoi(sub) );
             string strSend = "rate=" + sub;
             posMsg->sendClientToServer(strSend);
-        }      
+        }    
+        
+        if( (pos = prop.rfind("PositionspeedX=")) != string::npos )
+        {
+            string sub = prop.substr(pos+15);
+            cout << "PositionspeedX: " << (int)stoi(sub) << endl;
+            //position->setFixedRate( (char)stoi(sub) );
+            string strSend = "rateAzm=" + sub;
+            posMsg->sendClientToServer(strSend);
+        }  
+        
+        if( (pos = prop.rfind("PositionspeedY=")) != string::npos )
+        {
+            string sub = prop.substr(pos+15);
+            cout << "PositionspeedY: " << (int)stoi(sub) << endl;
+            //position->setFixedRate( (char)stoi(sub) );
+            string strSend = "rateAlt=" + sub;
+            posMsg->sendClientToServer(strSend);
+        }
         
         if( (pos = prop.rfind("Position=up")) != string::npos )
         {

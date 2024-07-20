@@ -729,6 +729,25 @@ int ObjectControl::processMsg()
 #elif defined(COMM_RS232_no) && defined(COMM_USB_yes)
             position2->setFixedRate( (char)stoi(sub) );
 #endif
+        } 
+        
+        if( (pos = rec.rfind("rateAzm=")) != string::npos )
+        {
+            string sub = rec.substr(pos+8);
+            cout << "rateAzm: " << (int)stoi(sub) << endl;
+#if defined(COMM_RS232_no) && defined(COMM_USB_yes)
+            position2->setFixedRateAzm( (char)stoi(sub) );
+#endif
+        }   
+        
+        
+        if( (pos = rec.rfind("rateAlt=")) != string::npos )
+        {
+            string sub = rec.substr(pos+8);
+            cout << "rateAlt: " << (int)stoi(sub) << endl;
+#if defined(COMM_RS232_no) && defined(COMM_USB_yes)
+            position2->setFixedRateAlt( (char)stoi(sub) );
+#endif
         }  
         
         if( (pos = rec.rfind("alt=1")) != string::npos )
@@ -751,7 +770,7 @@ int ObjectControl::processMsg()
             position->setFixedAlt( (int)position->getFixedRate() * CONTROL_FIXED_RATE );
             manualPos = true;
 #elif defined(COMM_RS232_no) && defined(COMM_USB_yes)
-            position2->setFixedAlt( pow(position2->getFixedRate(), CONTROL_EXP_RATE) * CONTROL_FIXED_RATE );
+            position2->setFixedAlt( pow(position2->getFixedRateAlt(), CONTROL_EXP_RATE) * CONTROL_FIXED_RATE );
             manualPos2 = true;
 #endif
         }  
@@ -776,11 +795,11 @@ int ObjectControl::processMsg()
             position->setFixedAlt( position->getFixedRate() * (-CONTROL_FIXED_RATE) );
             manualPos = true;
 #elif defined(COMM_RS232_no) && defined(COMM_USB_yes)
-            position2->setFixedAlt( pow(position2->getFixedRate(), CONTROL_EXP_RATE) * (-CONTROL_FIXED_RATE) );
+            position2->setFixedAlt( pow(position2->getFixedRateAlt(), CONTROL_EXP_RATE) * (-CONTROL_FIXED_RATE) );
             manualPos2 = true;
 #endif
         }  
-        else
+        
         if( (pos = rec.rfind("azm=-1")) != string::npos )
         {
             cout << "azm=-1" << endl;
@@ -801,7 +820,7 @@ int ObjectControl::processMsg()
             position->setFixedAzm( position->getFixedRate() * (-CONTROL_FIXED_RATE) );
             manualPos = true;
 #elif defined(COMM_RS232_no) && defined(COMM_USB_yes)
-            position2->setFixedAzm( pow(position2->getFixedRate(), CONTROL_EXP_RATE) * (-CONTROL_FIXED_RATE) );
+            position2->setFixedAzm( pow(position2->getFixedRateAzm(), CONTROL_EXP_RATE) * (-CONTROL_FIXED_RATE) );
             manualPos2 = true;
 #endif
         }  
@@ -826,7 +845,7 @@ int ObjectControl::processMsg()
             position->setFixedAzm( position->getFixedRate() * CONTROL_FIXED_RATE );
             manualPos = true;
 #elif defined(COMM_RS232_no) && defined(COMM_USB_yes)
-            position2->setFixedAzm( pow(position2->getFixedRate(), CONTROL_EXP_RATE) * CONTROL_FIXED_RATE );
+            position2->setFixedAzm( pow(position2->getFixedRateAzm(), CONTROL_EXP_RATE) * CONTROL_FIXED_RATE );
             manualPos2 = true;
 #endif
         }  
@@ -852,10 +871,11 @@ int ObjectControl::processMsg()
             manualPos = false;
 #elif defined(COMM_RS232_no) && defined(COMM_USB_yes)
             position2->setFixedAlt( 0 );
+            position2->setFixedRateAlt( 1 );
             manualPos2 = false;
 #endif
         }  
-        else
+        
         if( (pos = rec.rfind("azm=0")) != string::npos )
         {
             cout << "azm=0" << endl;
@@ -877,6 +897,7 @@ int ObjectControl::processMsg()
             manualPos = false;
 #elif defined(COMM_RS232_no) && defined(COMM_USB_yes)
             position2->setFixedAzm( 0 );
+            position2->setFixedRateAzm( 1 );
             manualPos2 = false;
 #endif
         }  
