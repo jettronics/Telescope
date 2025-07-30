@@ -34,7 +34,7 @@
 #define NOT_SHOW_CAMERA_WINDOW
 #define OPENCV_WAIT_FOR_KEY 20
 #define STABLE_PHOTO_SHOT (100/OPENCV_WAIT_FOR_KEY)
-#define ROI_WIDTH_RATIO 0.15 //0.15
+#define ROI_WIDTH_RATIO 0.8 //0.15
 //#define CONTROL_CYCLE_TIME 0.25
 #define TRACKING_METHOD "KCF"
 //#define TRACKING_METHOD "MIL"
@@ -45,10 +45,12 @@ CameraProperties::CameraProperties()
     : widthVideo(1280) //1441 
     , widthVideoOld(1280)
     , heightVideo(960) //1080
+    , heightVideoOld(960) //1080
 #else
     : widthVideo(640) //1441 
     , widthVideoOld(640)
     , heightVideo(480) //1080
+    , heightVideoOld(480) //1080
 #endif
     , widthImage(4056)
     , heightImage(3040)
@@ -153,6 +155,7 @@ Camera::Camera( TcpSocketCom *control, TcpSocketCom *stream, ProcMessage *proc, 
     , joystPosSpeedX(1)
     , joystButtonXState(0)
     , joystButtonSelectState(0)
+    , initObjectFlow(true)
 {
     objectControl = nullptr;
     dotTracking.area = 0.0;
@@ -476,7 +479,7 @@ int Camera::process( void )
                 cout<<"ROI update"<<endl;
                 // Calculate roi based on central point
                 roipt.x = roipt.x * camProps.widthVideo / camProps.widthVideoOld;
-                roipt.y = roipt.y * camProps.widthVideo / camProps.widthVideoOld;
+                roipt.y = roipt.y * camProps.heightVideo / camProps.heightVideoOld;
                 dotTracking.pnt = roipt;
                 runTracker = false;
                 initTracker = true;
@@ -499,6 +502,7 @@ int Camera::process( void )
         }
         
         camProps.widthVideoOld = camProps.widthVideo;
+        camProps.heightVideoOld = camProps.heightVideo;
         
         VideoCapture cap(CV_CAP_ANY);
                 
@@ -537,7 +541,7 @@ int Camera::process( void )
 #ifdef TELESCOPE_8SE
         //flip(imagein, imageout, -1);
         imageout = imagein.clone();
-        //bitwise_not(imageout, imageout);
+        bitwise_not(imageout, imageout);
 #else
         flip(imagein, imageout, 1);
 #endif
@@ -557,7 +561,7 @@ int Camera::process( void )
                 initTracker = false;
                 roiColor = Scalar(0,255,0);
                 roipt.x = ((int)roi.width >> 1) + roi.x;
-                roipt.y = ((int)roi.width >> 1) + roi.y; 
+                roipt.y = ((int)roi.height >> 1) + roi.y; 
                 dotFound = false;
                 cout << "Run Tracker" << endl;
             }
@@ -570,11 +574,12 @@ int Camera::process( void )
                     {   
                         tracker->update( imagetrack, roi );
                         roipt.x = ((int)roi.width >> 1) + roi.x;
-                        roipt.y = ((int)roi.width >> 1) + roi.y;
+                        roipt.y = ((int)roi.height >> 1) + roi.y;
                     }
                     else
                     {
-                        dotDetection();
+                        //dotDetection();
+                        objectFlowbySubPixels();
                     }
                 }
                 else
@@ -591,6 +596,10 @@ int Camera::process( void )
                     initRoi(roipt);
                     roiColor = Scalar(255,255,255);
                 }
+            }
+            else
+            {
+                initObjectFlow = true;
             }
             
             if( runControl == true )
@@ -861,6 +870,352 @@ void Camera::dotDetection()
     return;
 }
 
+void Camera::objectFlowbySubPixels()
+{
+    cvtColor(imagetrack(roi), imagegray, CV_RGB2GRAY);
+    if( initObjectFlow == false ) 
+    {
+        adaptiveThreshold(imagegray, imageproc, 255, ADAPTIVE_THRESH_GAUSSIAN_C, THRESH_BINARY, 15, -5); // 21, 2
+        morphologyEx(imageproc, imagemorph, cv::MORPH_OPEN, cv::Mat::ones(3,3,CV_8U));
+        findContours(imagemorph, contoursLoc, RETR_EXTERNAL, CHAIN_APPROX_SIMPLE); //RETR_LIST
+        
+        if( contoursLoc.size() > 0 )
+        {
+            contours = contoursLoc;
+            double maxArea = 30000.0; //500.0
+            int dotContourIndex = -1;
+            Point2f dotContour;
+            
+            vector<DotTrackingType> vecDotTrack;
+            vecDotTrack.clear();
+            
+            if( dotFound == false )
+            {
+                dotTracking.area = 0.0;
+                
+                for( size_t i = 0; i < contours.size(); i++ )
+                {
+                    double actArea = contourArea(contours[i]);
+                    
+                    if( actArea < maxArea ) 
+                    {
+                        if( actArea > dotTracking.area )
+                        {
+                            //cout << "actArea: " << actArea << ",maxContourIndex: " << i << endl;
+                            dotTracking.area = actArea;
+                            dotContourIndex = (int)i;
+                            float dotRadius;
+                            minEnclosingCircle(	contours[dotContourIndex], dotContour, dotRadius );
+                            Point2d roiDot;
+                            roiDot.x = roi.x + (double)dotContour.x;
+                            roiDot.y = roi.y + (double)dotContour.y;
+                            dotTracking.pnt = roiDot;
+                            dotFound = true;
+                        }
+                    }
+                }
+                if( dotFound == true )
+                {
+                    for( int i=0; i<MEDIAN_FILTER_SIZE; i++ )
+                    {
+                        medianInPosX[i] = (float)dotTracking.pnt.x;
+                        medianInPosY[i] = (float)dotTracking.pnt.y;
+                    }
+                }
+            }
+            else
+            {
+                for( size_t i = 0; i < contours.size(); i++ )
+                {
+                    double actArea = contourArea(contours[i]);
+                    DotTrackingType dotTrack;
+                                    
+                    //cout << "actArea: " << actArea << ",maxContourIndex: " << i << endl;
+                    dotContourIndex = (int)i;
+                    float dotRadius;
+                    minEnclosingCircle(	contours[dotContourIndex], dotContour, dotRadius );
+                    dotTrack.index = dotContourIndex;
+                    Point2d roiDot;
+                    roiDot.x = roi.x + (double)dotContour.x;
+                    roiDot.y = roi.y + (double)dotContour.y;
+                    Point2d roiDist = dotTracking.pnt-roiDot;
+                    double squaredSum = (roiDist.x * roiDist.x) + (roiDist.y * roiDist.y);
+                    dotTrack.distance = sqrt(squaredSum);
+                    //cout << "dist: " << dist << endl;
+                    dotTrack.pnt = roiDot;
+                    dotTrack.area = actArea;                  
+                    vecDotTrack.push_back(dotTrack);
+                }
+                double comb = 1500.0;
+                dotTracking.index = -1;
+                double minComb = 0.0;
+                for( int i = 0; i < vecDotTrack.size(); i++ )
+                {
+                    double diffArea = fabs(dotTracking.area - vecDotTrack[i].area);
+                    minComb = diffArea + vecDotTrack[i].distance;
+                    
+                    if( minComb < comb )
+                    {
+                        dotContourIndex = vecDotTrack[i].index;
+                        comb = minComb;
+                        dotTracking.index = i;
+                    }
+                }
+                
+                if( dotTracking.index >= 0 )
+                {
+                    dotTracking.pnt = vecDotTrack[dotTracking.index].pnt;
+                }
+                else
+                {
+                    dotTracking.pnt = Point2d(0.0, 0.0);
+                    dotFound = false;
+                }
+                
+            }
+            if( dotContourIndex >= 0 )
+            {
+                drawContours( imagetrack(roi), contours, dotContourIndex, Scalar(0,255,0), 2*drawScale, 1);
+                
+                Point2f pnt2f;
+                vector<Point2f> dots;
+                pnt2f.x = (float)dotTracking.pnt.x;
+                pnt2f.y = (float)dotTracking.pnt.y;
+                dots.push_back(pnt2f);
+                
+                imagegray.convertTo(imagefloat, CV_32F);
+                TermCriteria criteria(TermCriteria::EPS + TermCriteria::COUNT, 30, 0.01);
+                cornerSubPix(imagegray, dots, Size(5, 5), Size(-1, -1), criteria);
+                              
+                dotTracking.pnt.x = medianFilter( medianInPosX, dots[0].x);
+                dotTracking.pnt.y = medianFilter( medianInPosY, dots[0].y );
+                drawMarker( imagetrack, dotTracking.pnt, roiColor, MARKER_CROSS, (int)(50.0*drawScale), 2, 1 );
+                //cout << "dotTracking: " << dotTracking.pnt << endl;
+                
+                //dotTracking.pnt = vecDot[dotVecIndex];
+                //cout << "roi tracked: " << roiptDot << endl;
+            }
+            else
+            {
+                dotTracking.pnt = Point2d(0.0, 0.0);
+            }
+        }
+    }
+    else
+    {
+        initObjectFlow = false;
+    }
+    imageprev = imagegray.clone();
+    
+    return;
+}
+
+#if 0
+void Camera::objectFlowbySubPixels() 
+{
+    cvtColor(imagetrack(roi), imagegray, CV_RGB2GRAY);
+    
+    if( initObjectFlow == false ) 
+    {
+        adaptiveThreshold(imagegray, imageproc, 255, ADAPTIVE_THRESH_GAUSSIAN_C, THRESH_BINARY, 15, -5); // 21, 2
+        morphologyEx(imageproc, imagemorph, cv::MORPH_OPEN, cv::Mat::ones(3,3,CV_8U));
+        findContours(imagemorph, contoursLoc, RETR_EXTERNAL, CHAIN_APPROX_SIMPLE); //RETR_LIST
+        if( contoursLoc.size() > 0 )
+        {
+            contours = contoursLoc;
+            double maxArea = 30000.0; //500.0
+            dotTracking.area = 0.0;
+            int dotContourIndex = -1;
+            Point2f dotContour;
+            vector<Point2f> dots;
+           
+            for( size_t i = 0; i < contours.size(); i++ )
+            {
+                double actArea = contourArea(contours[i]);
+                
+                if( actArea < maxArea ) 
+                {
+                    //cout << "actArea: " << actArea << endl;
+                    //if( actArea > dotTracking.area )
+                    if( actArea > 16.0 )
+                    {
+                        //cout << "actArea: " << actArea << ",maxContourIndex: " << i << endl;
+                        dotTracking.area = actArea;
+                        dotContourIndex = (int)i;
+                        float dotRadius;
+                        minEnclosingCircle(	contours[dotContourIndex], dotContour, dotRadius );
+                        //Rect2d r = boundingRect(contours[i]);
+                        Point2d roiDot;
+                        roiDot.x = roi.x + (double)dotContour.x;
+                        roiDot.y = roi.y + (double)dotContour.y;
+                        //roiDot.x = roi.x + r.x + (r.width/2.0);
+                        //roiDot.y = roi.y + r.y + (r.height/2.0);
+                        dotTracking.pnt = roiDot;
+                        if( dots.size() < 5 )
+                        {
+                            Point2f pnt2f;
+                            pnt2f.x = (float)dotTracking.pnt.x;
+                            pnt2f.y = (float)dotTracking.pnt.y;
+                            dots.push_back(pnt2f);
+                        }
+                    }
+                }
+            }
+            
+            //if( dotTracking.area > 0.1 )
+            if( dots.size() > 0 )
+            {
+                imagegray.convertTo(imagefloat, CV_32F);
+                TermCriteria criteria(TermCriteria::EPS + TermCriteria::COUNT, 30, 0.01);
+                cornerSubPix(imagegray, dots, Size(5, 5), Size(-1, -1), criteria);
+                //cout << "cornerSubPix: x=" << dots[0].x << ", y=" << dots[0].y << endl;
+                
+                
+                //if( dotContourIndex >= 0 )
+                for( int i = 0; i < dots.size(); i++ )
+                {
+                    //cout << "dotArea: " << dotArea << endl;
+                    //drawContours( imagetrack(roi), contours, dotContourIndex, Scalar(0,255,0), 2*drawScale, 1);
+                    
+                    //dotTracking.pnt.x = medianFilter( medianInPosX, dotTracking.pnt.x );
+                    //dotTracking.pnt.y = medianFilter( medianInPosY, dotTracking.pnt.y );
+                    //drawMarker( imagetrack, dotTracking.pnt, roiColor, MARKER_CROSS, (int)(50.0*drawScale), 2, 1 );
+                    drawMarker( imagetrack, dots[i], roiColor, MARKER_CROSS, (int)(50.0*drawScale), 2, 1 );
+                }
+                
+                // -- Optical Flow Lucas-Kanade --
+                vector<Point2f> dotsMoved;
+                vector<uchar> status;
+                vector<float> err;
+ 
+                calcOpticalFlowPyrLK(imagegray, imageprev, dots, dotsMoved, status, err, Size(21, 21), 3, criteria);
+
+                if (status[0]) 
+                {
+                    Point2f meandelta;
+                    meandelta.x = 0.0f;
+                    meandelta.y = 0.0f;
+                    for( int i = 0; i < dotsMoved.size(); i++ )
+                    {
+                        Point2f delta = dotsMoved[i] - dots[i];
+                        meandelta.x += delta.x;
+                        meandelta.y += delta.y;
+                        cout << "Moved " << i << ": dx=" << delta.x << ", dy=" << delta.y << endl;
+                    }
+                    meandelta.x /= (float)dotsMoved.size();
+                    meandelta.y /= (float)dotsMoved.size();
+                    cout << "Mean moved: mx=" << meandelta.x << ", my=" << meandelta.y << endl;
+                } 
+                else 
+                {
+                    cout << "Tracking fehlgeschlagen." << endl;
+                }
+            }
+            dots.clear();
+        }
+    }
+    else
+    {
+        initObjectFlow = false;
+    }
+    imageprev = imagegray.clone();
+    
+#if 0    
+    // -- Bild laden (Graustufen) --
+    cv::Mat img1 = cv::imread("frame1.png", cv::IMREAD_GRAYSCALE);
+    cv::Mat img2 = cv::imread("frame2.png", cv::IMREAD_GRAYSCALE);
+
+    if (img1.empty() || img2.empty()) {
+        std::cerr << "Fehler beim Laden der Bilder." << std::endl;
+        return -1;
+    }
+
+    // -- adaptiveThreshold zur Sternsegmentierung --
+    cv::Mat thresh;
+    cv::adaptiveThreshold(img1, thresh, 255,
+                          cv::ADAPTIVE_THRESH_GAUSSIAN_C,
+                          cv::THRESH_BINARY, 15, -5);
+
+    // -- Rauschen filtern --
+    cv::Mat morph;
+    cv::morphologyEx(thresh, morph, cv::MORPH_OPEN, cv::Mat::ones(3,3,CV_8U));
+
+    // -- Konturen finden --
+    std::vector<std::vector<cv::Point>> contours;
+    cv::findContours(morph, contours, cv::RETR_EXTERNAL, cv::CHAIN_APPROX_SIMPLE);
+
+    // -- Größten "Stern" finden --
+    double maxArea = 0;
+    cv::Rect bestRect;
+    for (const auto& c : contours) {
+        double area = cv::contourArea(c);
+        if (area > maxArea) {
+            cv::Rect r = cv::boundingRect(c);
+            if (r.width > 4 && r.height > 4) {
+                maxArea = area;
+                bestRect = r;
+            }
+        }
+    }
+
+    if (maxArea == 0) {
+        std::cerr << "Kein geeigneter Stern gefunden." << std::endl;
+        return -1;
+    }
+
+    // -- Mittelpunkt mit Moments berechnen (grob) --
+    cv::Mat roi = img1(bestRect);
+    cv::Moments m = cv::moments(roi, true);
+    double cx = bestRect.x + m.m10 / m.m00;
+    double cy = bestRect.y + m.m01 / m.m00;
+    std::cout << "Zentrum (Momente): x=" << cx << ", y=" << cy << std::endl;
+
+    // -- Punkt als cv::Point2f vorbereiten --
+    std::vector<cv::Point2f> p0 = { cv::Point2f((float)cx, (float)cy) };
+
+    // -- Subpixel-Verfeinerung mit cornerSubPix --
+    cv::Mat img1_float;
+    img1.convertTo(img1_float, CV_32F); // cornerSubPix braucht float
+
+    cv::TermCriteria criteria(cv::TermCriteria::EPS + cv::TermCriteria::COUNT, 30, 0.01);
+    cv::cornerSubPix(img1, p0, cv::Size(5, 5), cv::Size(-1, -1), criteria);
+    std::cout << "Nach cornerSubPix: x=" << p0[0].x << ", y=" << p0[0].y << std::endl;
+
+    // -- Optical Flow Lucas-Kanade --
+    std::vector<cv::Point2f> p1;
+    std::vector<uchar> status;
+    std::vector<float> err;
+
+    cv::calcOpticalFlowPyrLK(img1, img2, p0, p1, status, err,
+                             cv::Size(21, 21), 3, criteria);
+
+    if (status[0]) {
+        float dx = p1[0].x - p0[0].x;
+        float dy = p1[0].y - p0[0].y;
+        std::cout << "Bewegung: dx=" << dx << ", dy=" << dy << std::endl;
+    } else {
+        std::cout << "Tracking fehlgeschlagen." << std::endl;
+    }
+
+    // -- Anzeige --
+    cv::Mat img1_c, img2_c;
+    cv::cvtColor(img1, img1_c, cv::COLOR_GRAY2BGR);
+    cv::cvtColor(img2, img2_c, cv::COLOR_GRAY2BGR);
+
+    cv::circle(img1_c, p0[0], 5, cv::Scalar(0, 255, 0), 2);
+    if (status[0]) {
+        cv::circle(img2_c, p1[0], 5, cv::Scalar(0, 0, 255), 2);
+        cv::line(img2_c, p0[0], p1[0], cv::Scalar(255, 0, 0), 1);
+    }
+
+    cv::imshow("Bild 1 - Zentrum", img1_c);
+    cv::imshow("Bild 2 - Optical Flow", img2_c);
+    cv::waitKey(0);
+#endif    
+    return;
+} 
+#endif
+
 void Camera::sendFocus()
 {
     string strSend = "mean=" + to_string(meanFocus) + ";";
@@ -990,9 +1345,9 @@ int Camera::setControl( string prop )
         {
             
             roiSize += 0.01;
-            if( roiSize > 0.5 )
+            if( roiSize > 0.8 ) //0.5
             {
-                roiSize = 0.5;
+                roiSize = 0.8;  //0.5
             }
             cout << "Position: roi size up: " << roiSize << endl;
             initRoi(roipt);
@@ -1306,10 +1661,10 @@ int Camera::setControl( string prop )
 
 void Camera::initRoi(Point2d pnt)
 {
+    roi.height = (double)((int)(camProps.heightVideo * roiSize));
     roi.width = (double)((int)(camProps.widthVideo * roiSize));
-    roi.height = roi.width;
     roi.x = (double)((int)(pnt.x - (roi.width * 0.5)));
-    roi.y = (double)((int)(pnt.y - (roi.width * 0.5)));
+    roi.y = (double)((int)(pnt.y - (roi.height * 0.5)));
     cout << "ROI rect: " << roi << endl;
 }
 
@@ -1333,10 +1688,9 @@ void Camera::changeZoom()
     focusLineLength = 5.0 * drawScale / zoomFactor;
 }
 
-int Camera::medianFilter( int *medArr, int in )
+float Camera::medianFilter( float *medArr, float in )
 {
-    int out = 0;
-    int sortArr[MEDIAN_FILTER_SIZE];
+    float sortArr[MEDIAN_FILTER_SIZE];
     for( int i=0; i<MEDIAN_FILTER_SIZE; i++ )
 	{
 		medArr[(MEDIAN_FILTER_SIZE-1)-i] = medArr[(MEDIAN_FILTER_SIZE-2)-i];
@@ -1346,7 +1700,7 @@ int Camera::medianFilter( int *medArr, int in )
     sortArr[0] = in;
     
     int len = sizeof(sortArr)/sizeof(sortArr[0]);
-    sort( sortArr, sortArr + len );
+    sort( sortArr, sortArr + len, greater<float>() );
     
     int indArr = (MEDIAN_FILTER_SIZE>>1);
     //cout << "indArr: " << indArr << endl;

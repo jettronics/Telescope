@@ -17,6 +17,7 @@ public:
    double widthVideo;
    double widthVideoOld;
    double heightVideo;
+   double heightVideoOld;
    double widthImage;
    double heightImage;
    double brightness;
@@ -53,10 +54,11 @@ private:
    string getDateAndTime();
    void stopVideoRecord();
    void dotDetection();
+   void objectFlowbySubPixels();
    void sendFocus();
    void calcFocus();
    void changeZoom();
-   int medianFilter(int *medArr, int in);
+   float medianFilter(float *medArr, float in);
    int handleJoystickEvents(string *msgEvents);
     
 private:
@@ -72,7 +74,7 @@ private:
    bool videoMode;
    int photoStable;
    int cameraState;
-   Mat imageout, imagein, imageshot, imagetrack, imagefocus, imagegray, imageproc;
+   Mat imageout, imagein, imageshot, imagetrack, imagefocus, imagegray, imageproc, imageprev, imagemorph, imagefloat;
    string writeMjpegHeader;
    string writeMjpegContent;
    bool displayByWindow;
@@ -94,14 +96,15 @@ private:
    double focusLineLength;
    double roiSize;
    DotTrackingType dotTracking;
-   int medianInPosX[MEDIAN_FILTER_SIZE];
-   int medianInPosY[MEDIAN_FILTER_SIZE];
+   float medianInPosX[MEDIAN_FILTER_SIZE];
+   float medianInPosY[MEDIAN_FILTER_SIZE];
    int joystHndl;
    struct js_event joystEvent;
    int joystVertState, joystHorState;
    int joystPosSpeedY, joystPosSpeedX;
    int joystButtonXState;
    int joystButtonSelectState;
+   bool initObjectFlow;
    //vector<double> osci1;
    //Ptr<plot::Plot2d> plot1;
 };
