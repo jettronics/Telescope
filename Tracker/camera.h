@@ -4,7 +4,7 @@
 using namespace std;
 using namespace cv;
 
-#define MEDIAN_FILTER_SIZE  11
+#define MEDIAN_FILTER_SIZE  7 //9 //11
 
 class CameraProperties
 {

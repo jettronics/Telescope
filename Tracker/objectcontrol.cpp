@@ -681,8 +681,9 @@ int ObjectControl::processMsg()
                     {
                         string width = sub.substr(startchar+1, xchar-1); 
                         string height = sub.substr(xchar+1, endchar-1); 
-                        inPos.x = (double)stoi(width);
-                        inPos.y = (double)stoi(height);
+                        inPos.x = (double)stod(width);
+                        inPos.y = (double)stod(height);
+                        //cout << "inPos: " << inPos << endl;
 #ifdef OBJ_CTRL_by_SPEED
                         inPos.x *= normFactor;
                         inPos.y *= normFactor;

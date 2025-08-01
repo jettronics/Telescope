@@ -547,6 +547,7 @@ int Camera::process( void )
 #endif
         
         imagetrack = imageout.clone();
+        //imageproc = imagetrack.clone();
         
         if( videoMode == true )
         {
@@ -604,19 +605,27 @@ int Camera::process( void )
             
             if( runControl == true )
             {
+                string strSend, strx, stry;
                 if( dotTracker == false )
                 {
                     // Call deinit after roipt reached closed to mid of image and start prediction
-                    string strSend = "roipt=" + to_string((int)roipt.x) + "x" + to_string((int)roipt.y) + ";";
-                    posMsg->sendClientToServer(strSend);
-                    //drawMarker( imagetrack, roipt, Scalar( 255, 255, 255 ), MARKER_CROSS, ((int)roi.width >> 2), 2, 1 );
+                    stringstream streamx, streamy;
+                    streamx << fixed << setprecision(2) << roipt.x;
+                    strx = streamx.str(); 
+                    streamy << fixed << setprecision(2) << roipt.y;
+                    stry = streamy.str(); 
                 }
                 else
                 {
-                    string strSend = "roipt=" + to_string((int)dotTracking.pnt.x) + "x" + to_string((int)dotTracking.pnt.y) + ";";
-                    posMsg->sendClientToServer(strSend);
+                    stringstream streamx, streamy;
+                    streamx << fixed << setprecision(2) << dotTracking.pnt.x;
+                    strx = streamx.str(); 
+                    streamy << fixed << setprecision(2) << dotTracking.pnt.y;
+                    stry = streamy.str(); 
                 }
-                
+                strSend = "roipt=" + strx + "x" + stry + ";";
+                //cout << "strSend: " << strSend << endl;
+                posMsg->sendClientToServer(strSend);
             }
             
 #ifdef FOCUS_yes
@@ -692,6 +701,7 @@ int Camera::process( void )
                 if( (enableTracker == true) || (recordVideo == true) )
                 {
                     processStreamMjpeg( imagetrack(zoom) );
+                    //processStreamMjpeg( imageproc );
                 }
                 else
                 {
@@ -875,14 +885,16 @@ void Camera::objectFlowbySubPixels()
     cvtColor(imagetrack(roi), imagegray, CV_RGB2GRAY);
     if( initObjectFlow == false ) 
     {
-        adaptiveThreshold(imagegray, imageproc, 255, ADAPTIVE_THRESH_GAUSSIAN_C, THRESH_BINARY, 15, -5); // 21, 2
-        morphologyEx(imageproc, imagemorph, cv::MORPH_OPEN, cv::Mat::ones(3,3,CV_8U));
-        findContours(imagemorph, contoursLoc, RETR_EXTERNAL, CHAIN_APPROX_SIMPLE); //RETR_LIST
+        adaptiveThreshold(imagegray, imagemorph, 255, ADAPTIVE_THRESH_GAUSSIAN_C, THRESH_BINARY, 27, -10); // 15, -5 // 21, 2 
+        //morphologyEx(imagemorph, imageproc, cv::MORPH_OPEN, cv::Mat::ones(3,3,CV_8U));
+        morphologyEx(imagemorph, imageproc, cv::MORPH_CLOSE, cv::Mat::ones(10,10,CV_8U));
+        findContours(imageproc, contoursLoc, RETR_EXTERNAL, CHAIN_APPROX_SIMPLE); //RETR_EXTERNAL //RETR_LIST
+        //findContours(imageproc, contoursLoc, RETR_EXTERNAL, CHAIN_APPROX_SIMPLE); //RETR_EXTERNAL //RETR_LIST
         
         if( contoursLoc.size() > 0 )
         {
             contours = contoursLoc;
-            double maxArea = 30000.0; //500.0
+            double maxArea = 100000.0; //30000.0; //500.0
             int dotContourIndex = -1;
             Point2f dotContour;
             
@@ -892,11 +904,11 @@ void Camera::objectFlowbySubPixels()
             if( dotFound == false )
             {
                 dotTracking.area = 0.0;
-                
+                //cout << "start" << endl;
                 for( size_t i = 0; i < contours.size(); i++ )
                 {
                     double actArea = contourArea(contours[i]);
-                    
+                    //cout << "actArea: " << actArea << ", i: " << i << endl;
                     if( actArea < maxArea ) 
                     {
                         if( actArea > dotTracking.area )
