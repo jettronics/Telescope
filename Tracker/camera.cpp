@@ -541,7 +541,7 @@ int Camera::process( void )
 #ifdef TELESCOPE_8SE
         //flip(imagein, imageout, -1);
         imageout = imagein.clone();
-        bitwise_not(imageout, imageout);
+        //bitwise_not(imageout, imageout);
 #else
         flip(imagein, imageout, 1);
 #endif
