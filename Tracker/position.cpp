@@ -8,6 +8,7 @@
 #include <unistd.h>
 #include <time.h>
 #include <sys/time.h>
+#include <sys/ioctl.h>
 #include <errno.h>
 #include <termios.h>
 #include <vector>
@@ -32,6 +33,7 @@ Position::Position()
     , waitTurnAzmCount(0)
     , waitTurnAlt(false)
     , waitTurnAltCount(0)
+    , slewingActive(0)
 {
     //strSend.clear();
     //arrSend.clear();
@@ -69,6 +71,7 @@ PositionUsb::~PositionUsb()
 
 void Position::init()
 {
+#if 0    
     cout << "Position init" << endl;
     
     //arrSend.clear();
@@ -103,17 +106,19 @@ void Position::init()
     tcsetattr(filestream, TCSAFLUSH, &options);     
     
     //tcsetattr(filestream, TCSANOW, &options);
-    
+#endif
     return;
 }
 
 void PositionUsb::init()
 {
     cout << "Position usb init" << endl;
-    
+
+#if 0    
     //arrSend.clear();
     
     filestream = open("/dev/ttyUSB0", O_RDWR | O_NOCTTY | O_NDELAY);
+    //filestream = open("/dev/ttyUSB0", O_RDWR);
     if (filestream == -1) 
     {
         cout << "UART open error" << endl;
@@ -131,7 +136,7 @@ void PositionUsb::init()
     options.c_cflag |=  CS8; 
     options.c_cflag |=  (CLOCAL | CREAD);  
     
-    options.c_lflag &= ~(ICANON | ECHO | ECHOE | ISIG);
+    options.c_lflag &= ~(ICANON | ECHO | ECHOE | ECHONL | ISIG);
     //options.c_iflag = IGNPAR;           /* Parity-Fehler ignorieren */
     options.c_iflag &= ~(IXON | IXOFF | IXANY);
     options.c_iflag &= ~(IGNBRK|BRKINT|PARMRK|ISTRIP|INLCR|IGNCR|ICRNL);
@@ -143,7 +148,53 @@ void PositionUsb::init()
     tcsetattr(filestream, TCSAFLUSH, &options);     
     
     //tcsetattr(filestream, TCSANOW, &options);
+#endif    
     
+    
+    filestream = open("/dev/ttyUSB0", O_RDWR );
+
+    // Create new termios struct, we call it 'tty' for convention
+    struct termios tty;
+
+    // Read in existing settings, and handle any error
+    if(tcgetattr(filestream, &tty) != 0) 
+    {
+        cout << "UART error: " << errno  << ", " << strerror(errno) << endl;
+    }
+
+    tty.c_cflag &= ~PARENB; // Clear parity bit, disabling parity (most common)
+    tty.c_cflag &= ~CSTOPB; // Clear stop field, only one stop bit used in communication (most common)
+    tty.c_cflag &= ~CSIZE; // Clear all bits that set the data size
+    tty.c_cflag |= CS8; // 8 bits per byte (most common)
+    tty.c_cflag &= ~CRTSCTS; // Disable RTS/CTS hardware flow control (most common)
+    tty.c_cflag |= CREAD | CLOCAL; // Turn on READ & ignore ctrl lines (CLOCAL = 1)
+    
+    tty.c_lflag &= ~ICANON;
+    tty.c_lflag &= ~ECHO; // Disable echo
+    tty.c_lflag &= ~ECHOE; // Disable erasure
+    tty.c_lflag &= ~ECHONL; // Disable new-line echo
+    tty.c_lflag &= ~ISIG; // Disable interpretation of INTR, QUIT and SUSP
+    tty.c_iflag &= ~(IXON | IXOFF | IXANY); // Turn off s/w flow ctrl
+    tty.c_iflag &= ~(IGNBRK|BRKINT|PARMRK|ISTRIP|INLCR|IGNCR|ICRNL); // Disable any special handling of received bytes
+    
+    tty.c_oflag &= ~OPOST; // Prevent special interpretation of output bytes (e.g. newline chars)
+    tty.c_oflag &= ~ONLCR; // Prevent conversion of newline to carriage return/line feed
+    // tty.c_oflag &= ~OXTABS; // Prevent conversion of tabs to spaces (NOT PRESENT ON LINUX)
+    // tty.c_oflag &= ~ONOEOT; // Prevent removal of C-d chars (0x004) in output (NOT PRESENT ON LINUX)
+
+    tty.c_cc[VTIME] = 50;    // Wait for up to 1s (10 deciseconds), returning as soon as any data is received.
+    tty.c_cc[VMIN] = 0;
+
+    // Set in/out baud rate to be 9600
+    cfsetispeed(&tty, B9600);
+    cfsetospeed(&tty, B9600);
+
+    // Save tty settings, also checking for error
+    if (tcsetattr(filestream, TCSANOW, &tty) != 0) 
+    {
+        cout << "tcsetattr error: " << errno  << ", " << strerror(errno) << endl;
+    }
+
     return;
 }
     
@@ -507,43 +558,51 @@ void PositionUsb::process()
         if( (msgReceived == true) && (waitReceived >= 2) )
         {
             waitReceived = 0;
-            //cout << "Position usb send:";
-            if( sendAzm == false )
+            
+            int azmActive = (int)arrBufAzm[4] + (int)arrBufAzm[5];
+            int altActive = (int)arrBufAlt[4] + (int)arrBufAlt[5];
+            if( ((azmActive != 0) || (altActive != 0)) && (slewingActive == 0) )
             {
-                sendAzm = true;
+                slewingActive = 2;
+                if( azmActive != 0 )
+                {
+                    sendAzm = true;
+                }
+                cout << "Slewing active" << endl;
+            }
+            
+            if( slewingActive > 0 )
+            {
                 for( int i=0; i < 8; i++ )
                 {
-                    arrBuf[i] = arrBufAzm[i];
-                    /*cout << hex << " " << (int)arrBuf[i];
-                    if( i == 7 )
+                    if( sendAzm == false )
                     {
-                        cout << endl;
-                    }*/
+                        arrBuf[i] = arrBufAlt[i];
+                    }
+                    else
+                    {
+                        arrBuf[i] = arrBufAzm[i];
+                    }
                 }
-            }
-            else
-            {
-                sendAzm = false;
-                for( int i=0; i < 8; i++ )
+                if( sendAzm == false )
                 {
-                    arrBuf[i] = arrBufAlt[i];
-                    /*cout << hex << " " << (int)arrBuf[i];
-                    if( i == 7 )
-                    {
-                        cout << endl;
-                    }*/
+                    sendAzm = true;
                 }
-            }
-            //cout << endl;
-            //cout.flush();
-            int rettx = write(filestream, arrBuf, 8);
-            if (rettx < 0) 
-            {
-                cout << "UART usb TX error" << endl;
-            }
-            else
-            {
-                msgReceived = false;
+                else
+                {
+                    sendAzm = false;
+                }
+                int rettx = write(filestream, arrBuf, 8);
+                if (rettx < 0) 
+                {
+                    cout << "UART usb TX error" << endl;
+                }
+                
+                if( ((azmActive == 0) && (altActive == 0)) && (slewingActive > 0) )
+                {
+                    slewingActive--;
+                    cout << "Slewing stopping: " << slewingActive << endl;
+                }
             }
             //cout.flush();
         }

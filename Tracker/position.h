@@ -44,7 +44,8 @@ protected:
    bool waitTurnAzm;
    int waitTurnAzmCount;
    bool waitTurnAlt;
-   int waitTurnAltCount;    
+   int waitTurnAltCount;  
+   int slewingActive;
 };
 
 class PositionUsb : public Position

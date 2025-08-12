@@ -69,7 +69,7 @@ ObjectControl::ObjectControl(Position *position, Position *position2, ProcMessag
     , Td(0.5) //Object speed -> 8 entries every 0.25s = 2s -> 0.5 1/s
     , width(0)
     , height(0)
-    , arcsecondPerPixel(31.0,28.9)
+    , arcsecondPerPixel(4.1,3.8) //31.0,28.9
     , arcsecondsSpeedLimitedOld(0,0)
     , initFlag(true)
     , trackFlag(false)
