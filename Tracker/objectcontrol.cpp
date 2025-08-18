@@ -11,14 +11,10 @@
 #include "objectcontrol.h"
 
 
-#ifdef TELESCOPE_8SE
 #define CONTROL_FIXED_RATE 20
 #define CONTROL_EXP_RATE 1.9
 #define SPEED_MAX_LIMIT 400
-#else
-#define CONTROL_FIXED_RATE 40
-#define SPEED_MAX_LIMIT 100
-#endif
+
 
 ObjectControl::ObjectControl()
 {
@@ -116,8 +112,6 @@ void ObjectControl::init(double width, double height)
 {
     cout << "init = " << width << "x" << height << endl;
     
-#ifdef TELESCOPE_8SE
-
     ctrlPos.x = width * 0.5;
     ctrlPos.y = height * 0.5;
     
@@ -134,28 +128,6 @@ void ObjectControl::init(double width, double height)
     speedObject = Point2d(0.0,0.0);
     speedObjectMeasured = false;
     
-#else
-
-    //arcsecondPerPixel = 9802.0 / height;
-    arcsecondPerPixel.y = 857.0 / height;
-        
-    ctrlPos.x = 1143.0 * 0.5;
-    ctrlPos.y = 857.0 * 0.5;
-    
-    inPos.x = width * 0.5;
-    inPos.y = height * 0.5;
-    
-    // Just for testing
-    //inPosArc = arcsecondPerPixel * inPos;
-    
-    arcsecondsSpeedLimitedOld = Point2i(0,0);
-    arcsecondsSpeedPredict = Point2i(0,0);
-    
-    speedFieldOut[0] = 0;
-    speedFieldOut[1] = 0;
-    
-#endif
-
     cout << "arcsecondPerPixel = " << arcsecondPerPixel << endl;
     cout << dec << "Init inPos = " << inPos << endl;
     
@@ -253,22 +225,11 @@ void ObjectControl::controlPosition()
 		//cout << "Predict arcsecLim/s = " << arcsecondsSpeedLimited << "''/s" << endl;
 	}
 
-#ifdef COMM_RS232_yes
-	if( manualPos == false )
-	{
-		position->setVariableAzm(arcsecondsSpeedLimited.x);
-		//cout << dec << "arcsecLim/s = " << arcsecondsSpeedLimited << "''/s" << endl;
-		position->setVariableAlt(arcsecondsSpeedLimited.y);
-		//cout << dec << "arcsecLim/s = " << arcsecondsSpeedLimited << "''/s" << endl;
-	}
-#endif
-#ifdef COMM_USB_yes
 	if( manualPos2 == false )
 	{
 		position2->setVariableAzm(arcsecondsSpeedLimited.x);
 		position2->setVariableAlt(arcsecondsSpeedLimited.y);
 	}
-#endif
 
 	//arcsecondsSpeedLimitedOld = arcsecondsSpeedLimited;
 
@@ -398,22 +359,11 @@ void ObjectControl::controlPositionExt()
         Point2i arcsecondsSpeedLimited;
         arcsecondsSpeedLimited = speedMax( arcsecondsSpeed );
 
-#ifdef COMM_RS232_yes
-        if( manualPos == false )
-        {
-            position->setVariableAzm(arcsecondsSpeedLimited.x);
-            //cout << dec << "arcsecLim/s = " << arcsecondsSpeedLimited << "''/s" << endl;
-            position->setVariableAlt(arcsecondsSpeedLimited.y);
-            //cout << dec << "arcsecLim/s = " << arcsecondsSpeedLimited << "''/s" << endl;
-        }
-#endif
-#ifdef COMM_USB_yes
         if( manualPos2 == false )
         {
             position2->setVariableAzm(arcsecondsSpeedLimited.x);
             position2->setVariableAlt(arcsecondsSpeedLimited.y);
         }
-#endif
     }
 
     return;
@@ -583,39 +533,18 @@ void ObjectControl::controlSpeed()
     Point2i arcsecondsSpeedLimited;
 	arcsecondsSpeedLimited = speedMax( arcsecondsSpeed );
 
-#ifdef COMM_RS232_yes
-	if( manualPos == false )
-	{
-		position->setVariableAzm(arcsecondsSpeedLimited.x);
-		//cout << dec << "arcsecLim/s = " << arcsecondsSpeedLimited << "''/s" << endl;
-		position->setVariableAlt(arcsecondsSpeedLimited.y);
-		//cout << dec << "arcsecLim/s = " << arcsecondsSpeedLimited << "''/s" << endl;
-	}
-#endif
-#ifdef COMM_USB_yes
     if( manualPos2 == false )
 	{
 		position2->setVariableAzm(arcsecondsSpeedLimited.x);
 		position2->setVariableAlt(arcsecondsSpeedLimited.y);
 	}
-#endif
 
     return;
 }
 
 void ObjectControl::process()
 {
-#ifdef OBJ_CTRL_by_POS
-#ifdef TELESCOPE_8SE
     controlPositionExt();
-#else
-	controlPosition();
-#endif
-#endif
-#ifdef OBJ_CTRL_by_SPEED
-	controlSpeed();
-#endif
-
 	return;
 }
 
@@ -656,11 +585,6 @@ int ObjectControl::processMsg()
                         string height = sub.substr(xchar+1, endchar-1); 
                         double dwidth = (double)stoi(width);
                         double dheight = (double)stoi(height);
-#ifdef OBJ_CTRL_by_SPEED
-                        normFactor = 1280.0 / dwidth;
-                        dwidth *= normFactor;
-                        dheight *= normFactor;
-#endif
                         init(dwidth, dheight);
                     }
                 }
@@ -684,18 +608,6 @@ int ObjectControl::processMsg()
                         inPos.x = (double)stod(width);
                         inPos.y = (double)stod(height);
                         //cout << "inPos: " << inPos << endl;
-#ifdef OBJ_CTRL_by_SPEED
-                        inPos.x *= normFactor;
-                        inPos.y *= normFactor;
-                        if( trackFlag == false )
-                        {
-                            inPosStart = inPos;
-                            if( arcsecondPerPixel.x < 0.1 )
-                            {
-                                arcToPixelMeasurement = true;
-                            }
-                        }
-#endif
                         trackFlag = true;
                         predictCalc = false;
                     }
@@ -703,42 +615,18 @@ int ObjectControl::processMsg()
             }
         }
 
-#if defined(COMM_RS232_yes) && defined(COMM_USB_yes)
-        if( (pos = rec.rfind("sel=")) != string::npos )
-        {
-            string sub = rec.substr(pos+4);
-            cout << "sel: " << (int)stoi(sub) << endl;
-            selector = (int)stoi(sub);
-        }
-        else
-#endif
         if( (pos = rec.rfind("rate=")) != string::npos )
         {
             string sub = rec.substr(pos+5);
             cout << "rate: " << (int)stoi(sub) << endl;
-#if defined(COMM_RS232_yes) && defined(COMM_USB_yes)
-            if( selector == 0 )
-            {
-                position->setFixedRate( (char)stoi(sub) );
-            }
-            else
-            {
-                position2->setFixedRate( (char)stoi(sub) );
-            }
-#elif defined(COMM_RS232_yes) && defined(COMM_USB_no)
-            position->setFixedRate( (char)stoi(sub) );
-#elif defined(COMM_RS232_no) && defined(COMM_USB_yes)
             position2->setFixedRate( (char)stoi(sub) );
-#endif
         } 
         
         if( (pos = rec.rfind("rateAzm=")) != string::npos )
         {
             string sub = rec.substr(pos+8);
             cout << "rateAzm: " << (int)stoi(sub) << endl;
-#if defined(COMM_RS232_no) && defined(COMM_USB_yes)
             position2->setFixedRateAzm( (char)stoi(sub) );
-#endif
         }   
         
         
@@ -746,161 +634,51 @@ int ObjectControl::processMsg()
         {
             string sub = rec.substr(pos+8);
             cout << "rateAlt: " << (int)stoi(sub) << endl;
-#if defined(COMM_RS232_no) && defined(COMM_USB_yes)
             position2->setFixedRateAlt( (char)stoi(sub) );
-#endif
         }  
         
         if( (pos = rec.rfind("alt=1")) != string::npos )
         {
             cout << "alt=1" << endl;
-#if defined(COMM_RS232_yes) && defined(COMM_USB_yes)
-            if( selector == 0 )
-            {
-                position->setFixedAlt( (int)position->getFixedRate() * CONTROL_FIXED_RATE );
-                manualPos = true;
-                //trackFlag = false;
-            }
-            else
-            {
-                position2->setFixedAlt( position2->getFixedRate() * CONTROL_FIXED_RATE );
-                manualPos2 = true;
-                //trackFlag = false;
-            }
-#elif defined(COMM_RS232_yes) && defined(COMM_USB_no)
-            position->setFixedAlt( (int)position->getFixedRate() * CONTROL_FIXED_RATE );
-            manualPos = true;
-#elif defined(COMM_RS232_no) && defined(COMM_USB_yes)
             position2->setFixedAlt( pow(position2->getFixedRateAlt(), CONTROL_EXP_RATE) * CONTROL_FIXED_RATE );
             manualPos2 = true;
-#endif
         }  
         else
         if( (pos = rec.rfind("alt=-1")) != string::npos )
         {
             cout << "alt=-1" << endl;
-#if defined(COMM_RS232_yes) && defined(COMM_USB_yes)
-            if( selector == 0 )
-            {
-                position->setFixedAlt( position->getFixedRate() * (-CONTROL_FIXED_RATE) );
-                manualPos = true;
-                //trackFlag = false;
-            }
-            else
-            {
-                position2->setFixedAlt( position2->getFixedRate() * (-CONTROL_FIXED_RATE) );
-                manualPos2 = true;
-                //trackFlag = false;
-            }
-#elif defined(COMM_RS232_yes) && defined(COMM_USB_no)
-            position->setFixedAlt( position->getFixedRate() * (-CONTROL_FIXED_RATE) );
-            manualPos = true;
-#elif defined(COMM_RS232_no) && defined(COMM_USB_yes)
             position2->setFixedAlt( pow(position2->getFixedRateAlt(), CONTROL_EXP_RATE) * (-CONTROL_FIXED_RATE) );
             manualPos2 = true;
-#endif
         }  
         
         if( (pos = rec.rfind("azm=-1")) != string::npos )
         {
             cout << "azm=-1" << endl;
-#if defined(COMM_RS232_yes) && defined(COMM_USB_yes)
-            if( selector == 0 )
-            {
-                position->setFixedAzm( position->getFixedRate() * (-CONTROL_FIXED_RATE) ); 
-                manualPos = true;
-                //trackFlag = false;
-            }
-            else
-            {
-                position2->setFixedAzm( position2->getFixedRate() * (-CONTROL_FIXED_RATE) ); 
-                manualPos2 = true;
-                //trackFlag = false;
-            }
-#elif defined(COMM_RS232_yes) && defined(COMM_USB_no)
-            position->setFixedAzm( position->getFixedRate() * (-CONTROL_FIXED_RATE) );
-            manualPos = true;
-#elif defined(COMM_RS232_no) && defined(COMM_USB_yes)
             position2->setFixedAzm( pow(position2->getFixedRateAzm(), CONTROL_EXP_RATE) * (-CONTROL_FIXED_RATE) );
             manualPos2 = true;
-#endif
         }  
         else
         if( (pos = rec.rfind("azm=1")) != string::npos )
         {
             cout << "azm=1" << endl;
-#if defined(COMM_RS232_yes) && defined(COMM_USB_yes)
-            if( selector == 0 )
-            {
-                position->setFixedAzm( position->getFixedRate() * CONTROL_FIXED_RATE );   
-                manualPos = true;
-                //trackFlag = false;
-            }
-            else
-            {
-                position2->setFixedAzm( position2->getFixedRate() * CONTROL_FIXED_RATE );  
-                manualPos2 = true;
-                //trackFlag = false;
-            }
-#elif defined(COMM_RS232_yes) && defined(COMM_USB_no)
-            position->setFixedAzm( position->getFixedRate() * CONTROL_FIXED_RATE );
-            manualPos = true;
-#elif defined(COMM_RS232_no) && defined(COMM_USB_yes)
             position2->setFixedAzm( pow(position2->getFixedRateAzm(), CONTROL_EXP_RATE) * CONTROL_FIXED_RATE );
             manualPos2 = true;
-#endif
         }  
         
         if( (pos = rec.rfind("alt=0")) != string::npos )
         {
             cout << "alt=0" << endl;
-#if defined(COMM_RS232_yes) && defined(COMM_USB_yes)
-            if( selector == 0 )
-            {
-                position->setFixedAlt( 0 );   
-                manualPos = false;
-                //trackFlag = false;
-            }
-            else
-            {
-                position2->setFixedAlt( 0 ); 
-                manualPos2 = false;
-                //trackFlag = false;
-            }   
-#elif defined(COMM_RS232_yes) && defined(COMM_USB_no)
-            position->setFixedAlt( 0 );
-            manualPos = false;
-#elif defined(COMM_RS232_no) && defined(COMM_USB_yes)
             position2->setFixedAlt( 0 );
             position2->setFixedRateAlt( 1 );
             manualPos2 = false;
-#endif
         }  
         
         if( (pos = rec.rfind("azm=0")) != string::npos )
         {
             cout << "azm=0" << endl;
-#if defined(COMM_RS232_yes) && defined(COMM_USB_yes)
-            if( selector == 0 )
-            {
-                position->setFixedAzm( 0 );   
-                manualPos = false;
-                //trackFlag = false;
-            }
-            else
-            {
-                position2->setFixedAzm( 0 ); 
-                manualPos2 = false;
-                //trackFlag = false;
-            }
-#elif defined(COMM_RS232_yes) && defined(COMM_USB_no)
-            position->setFixedAzm( 0 );
-            manualPos = false;
-#elif defined(COMM_RS232_no) && defined(COMM_USB_yes)
             position2->setFixedAzm( 0 );
             position2->setFixedRateAzm( 1 );
             manualPos2 = false;
-#endif
         }  
         
         if( (pos = rec.find("exit")) != string::npos )

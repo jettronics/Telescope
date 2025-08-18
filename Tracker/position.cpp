@@ -34,6 +34,7 @@ Position::Position()
     , waitTurnAlt(false)
     , waitTurnAltCount(0)
     , slewingActive(0)
+    , gotoActive(0)
 {
     //strSend.clear();
     //arrSend.clear();
@@ -54,6 +55,25 @@ Position::Position()
     arrBufAzm[5] = (char)0;
     arrBufAzm[6] = (char)0;
     arrBufAzm[7] = (char)0;
+    
+    arrBufGoto[0] = (char)'b';
+    arrBufGoto[1] = (char)'0';
+    arrBufGoto[2] = (char)'0';
+    arrBufGoto[3] = (char)'0';
+    arrBufGoto[4] = (char)'0';
+    arrBufGoto[5] = (char)'0';
+    arrBufGoto[6] = (char)'0';
+    arrBufGoto[7] = (char)'0';
+    arrBufGoto[8] = (char)'0';
+    arrBufGoto[9] = (char)',';
+    arrBufGoto[10] = (char)'0';
+    arrBufGoto[11] = (char)'0';
+    arrBufGoto[12] = (char)'0';
+    arrBufGoto[13] = (char)'0';
+    arrBufGoto[14] = (char)'0';
+    arrBufGoto[15] = (char)'0';
+    arrBufGoto[16] = (char)'0';
+    arrBufGoto[17] = (char)'0';
 }
 
 Position::~Position()
@@ -453,6 +473,7 @@ void Position::setVariableAlt( int alt )
     return;    
 }
 
+
 void Position::process()
 {
     if( filestream != -1 )
@@ -596,12 +617,22 @@ void PositionUsb::process()
                 if (rettx < 0) 
                 {
                     cout << "UART usb TX error" << endl;
-                }
+                } 
                 
                 if( ((azmActive == 0) && (altActive == 0)) && (slewingActive > 0) )
                 {
                     slewingActive--;
                     cout << "Slewing stopping: " << slewingActive << endl;
+                }
+            }
+            else
+            if( gotoActive > 0 )
+            {
+                gotoActive--;
+                int rettx = write(filestream, arrBufGoto, 18);
+                if (rettx < 0) 
+                {
+                    cout << "UART usb TX error" << endl;
                 }
             }
             //cout.flush();

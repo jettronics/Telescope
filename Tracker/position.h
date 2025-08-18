@@ -7,6 +7,7 @@ class Position
 {
    
 public:
+   enum ModeType { None = 0, SlewingActive, GotoActive };
    Position();
    virtual ~Position();
 
@@ -24,6 +25,7 @@ public:
    char getFixedRateAlt() { return fixedRateAlt; }
    void setVariableAzm( int azm );
    void setVariableAlt( int alt );
+   ModeType getMode();
    
 protected:
    int filestream;
@@ -31,6 +33,7 @@ protected:
    char arrBuf[8];
    char arrBufAlt[8];
    char arrBufAzm[8];
+   char arrBufGoto[18];
    char fixedRate;
    char fixedRateAlt;
    char fixedRateAzm;
@@ -46,6 +49,7 @@ protected:
    bool waitTurnAlt;
    int waitTurnAltCount;  
    int slewingActive;
+   int gotoActive;
 };
 
 class PositionUsb : public Position
