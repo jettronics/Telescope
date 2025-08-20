@@ -106,7 +106,7 @@ string TcpSocketCom::getData()
 
     if( initfailed == false )
     {
-        n = read(newsockfd, buffer, 100);
+        n = read(newsockfd, buffer, 120);
     }
     
     if ( n < 0 )
