@@ -19,10 +19,8 @@
 #include <raspicam/raspicam.h>
 #include <linux/joystick.h>
 
-#include "setup.h"
 #include "tcpsocketcom.h"
 #include "procmessage.h"
-#include "focus.h"
 #include "position.h"
 #include "objectcontrol.h"
 #include "camera.h"
@@ -104,12 +102,7 @@ int main(int argc, char *argv[])
         while( 1 )
         {
             exitCond = objectcontrol.processMsg();
-#ifdef COMM_RS232_yes
-            position.process();
-#endif
-#ifdef COMM_USB_yes
             posUsb->process();
-#endif
             
             if( exitCond < 0 )
             {
@@ -127,21 +120,6 @@ int main(int argc, char *argv[])
     }
     else if (pid[1] == 0 && pid[0] > 0) 
     {
-#ifdef FOCUS_yes
-    	Focus focus(&msgFocCam);
-        
-        focus.init();
-        
-        while( 1 )
-        {
-            if( focus.processMsg() < 0 )
-            {
-                break;
-            }
-        }
-        
-        focus.deInit();
-#endif
         exit(0);
     }
     else

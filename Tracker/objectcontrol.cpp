@@ -5,6 +5,7 @@
 #include <stdlib.h>
 #include <unistd.h>
 
+
 #include "setup.h"
 #include "procmessage.h"
 #include "position.h"
@@ -100,6 +101,14 @@ ObjectControl::ObjectControl(Position *position, Position *position2, ProcMessag
     speedCentre = Point2d(0.0,0.0);
     speedObject = Point2d(0.0,0.0);
     clock_gettime(CLOCK_REALTIME, &start);
+    solarObj = "";
+    spaceObj = "";
+    objRaDec.ra = 0.0;
+    objRaDec.dec = 0.0;
+    location.lat = 0.0; /* N */
+	location.lng = 0.0; /* E */
+    orientation.alt = 0.0;
+    orientation.az = 0.0;
 }
 
 
@@ -370,178 +379,6 @@ void ObjectControl::controlPositionExt()
 }
 
 
-void ObjectControl::controlSpeed()
-{
-    Point2d inDiff = inPos - ctrlPos;
-    
-    // arcs to pixel measurement
-    if( arcToPixelMeasurement == true )
-    {
-        speedTelescope.x = 150.0;
-        double startMeasure = inPos.x - inPosStart.x;
-        if( (fabs(inDiff.x) > 10.0) && (fabs(startMeasure) > 10.0) )
-        {
-            arcToPixelTime += dt;
-        }
-        else
-        if( (fabs(inDiff.x) < 10.0) )
-        {
-            double arcToPixelDistance = (fabs(inPosStart.x)-10.0) - fabs(inPos.x);
-            cout << dec << "arcs to pixel time = " << arcToPixelTime << "s" << endl;
-            cout << dec << "arcs to pixel distance = " << arcToPixelDistance << "px" << endl;
-            arcsecondPerPixel.x = (arcToPixelTime / arcToPixelDistance) * speedTelescope.x;
-            cout << dec << "arc seconds per pixel = " << arcsecondPerPixel.x << "arcs/px" << endl;
-            arcToPixelTime = 0.0;
-            arcToPixelDistance = 0.0;
-            arcToPixelMeasurement = false;
-            speedTelescope = Point2d(0.0,0.0);
-        } 
-    }
-    else
-    {
-        if( initFlag == true )
-        {
-            initFlag = false;
-            inArcDiffOld = Point2d(0.0,0.0);
-            ctrlPos = inPos;
-            inDiff = Point2d(0.0,0.0);
-            speedTelescope = Point2d(0.0,0.0);
-            speedObject = Point2d(0.0,0.0);
-            speedCentre = Point2d(0.0,0.0);
-            speedUpdateTime = 0.0;
-            speedObjectMeasured = false;
-            cout << "Tracking initialized" << endl;
-        }
-        
-        inArcDiff.x = arcsecondPerPixel.x * inDiff.x;
-        inArcDiff.y = arcsecondPerPixel.y * inDiff.y;
-        // Moving average
-        //double invN = dt / (0.5 + dt);
-        //inArcDiff =  inArcDiff + ((inArcDiffLoc - inArcDiff)*invN);
-        //inArcDiff = inArcDiffLoc;
-        
-    	speedUpdateTime += dt;
-        if( speedObjectMeasured == false )
-        {
-            Point2d distDiffPnt = inArcDiff - inArcDiffOld;
-            double distDiffArc = (distDiffPnt.x * distDiffPnt.x) + (distDiffPnt.y * distDiffPnt.y);
-            distDiffArc = sqrt(distDiffArc);
-            //if( distDiffArc > 2500.0 ) //3000 -> 100px
-            {
-                speedObjectMeasured = true;
-                speedObject = ((inArcDiff - inArcDiffOld)/speedUpdateTime);
-                
-                //Test only
-                speedObject.x = 100.0;
-                speedObject.y = 0.0;
-                /*ctrlPos.x = 400.0;
-                ctrlPos.y = 500.0;
-                inDiff = inPos - ctrlPos;
-                inArcDiff.x = arcsecondPerPixel.x * inDiff.x;
-                inArcDiff.y = arcsecondPerPixel.y * inDiff.y;*/
-                
-                inArcDiffOld = inArcDiff;
-                speedCentre.x = fmin(inArcDiffOld.x, (double)SPEED_MAX_LIMIT);
-                speedCentre.y = fmin(inArcDiffOld.y, (double)SPEED_MAX_LIMIT);
-                speedTelescope = speedObject + speedCentre;
-                speedUpdateTime = 0.0;
-                cout << "Object speed measured: " << speedObject << endl;
-                cout << "Telescope speed: " << speedTelescope << endl;
-            }
-        }
-        else
-        {
-            if( speedUpdateTime >= 5.0 ) //1.0
-            {
-                //Point2d realDiff = (inArcDiff - inArcDiffOld)/speedUpdateTime;
-                Point2d inArcDiffGuess = inArcDiffOld + speedObject - speedTelescope - speedCentre;
-                //speedObject = realDiff + (inArcDiffOld/8.0) + speedTelescope;
-                
-                //v_o_out(i) = (p_o_out(i) - p_o_out(i-1) + (v_t(i)*T))/T;
-                //v_t(i+1) = v_o_out(i)+(p_o_out(i)/T_c);
-                //speedObject = ((inArcDiff - inArcDiffOld)/speedUpdateTime);// + speedTelescope;
-                //speedTelescope = speedObject + (inArcDiff/6.0); //5.0
-                //inArcDiffOld = inArcDiff;
-                speedUpdateTime = 0.0;
-                inArcDiffOld = inArcDiff;
-                speedCentre.x = fmin(inArcDiffOld.x, (double)SPEED_MAX_LIMIT);
-                speedCentre.y = fmin(inArcDiffOld.y, (double)SPEED_MAX_LIMIT);
-                cout << dec << "inArcDiff: " << inArcDiff << ", inArcDiffGuess: " << inArcDiffGuess << endl;
-                cout << "Object speed update: " << speedObject << endl;
-                
-                Point2d speedTelescopeLoc = speedObject + speedCentre;
-#if 0                
-                if( (speedTelescopeLoc.x > 0.0) && (speedTelescope.x < 0.0) )
-                {
-                    speedTelescopeLoc.x = -5.0;
-                    //cout << "Telescope speed limit: " << speedTelescopeLoc << endl;
-                }
-                else
-                if( (speedTelescopeLoc.x < 0.0) && (speedTelescope.x > 0.0) )
-                {
-                    speedTelescopeLoc.x = 5.0;
-                    //cout << "Telescope speed limit: " << speedTelescopeLoc << endl;
-                }
-                else
-                if( fabs(speedTelescopeLoc.x) < 5.0 )
-                {
-                    if( speedTelescopeLoc.x > 0.0 )
-                    {
-                        speedTelescopeLoc.x = 5.0;
-                    }
-                    else
-                    {
-                        speedTelescopeLoc.x = -5.0;
-                    } 
-                    //cout << "Telescope speed limit: " << speedTelescopeLoc << endl;
-                }
-                
-                if( (speedTelescopeLoc.y > 0.0) && (speedTelescope.y < 0.0) )
-                {
-                    speedTelescopeLoc.y = -5.0;
-                    //cout << "Telescope speed limit: " << speedTelescopeLoc << endl;
-                }
-                else
-                if( (speedTelescopeLoc.x < 0.0) && (speedTelescope.x > 0.0) )
-                {
-                    speedTelescopeLoc.y = 5.0;
-                    //cout << "Telescope speed limit: " << speedTelescopeLoc << endl;
-                }
-                else
-                if( fabs(speedTelescopeLoc.y) < 5.0 )
-                {
-                    if( speedTelescopeLoc.y > 0.0 )
-                    {
-                        speedTelescopeLoc.y = 5.0;
-                    }
-                    else
-                    {
-                        speedTelescopeLoc.y = -5.0;
-                    } 
-                    //cout << "Telescope speed limit: " << speedTelescopeLoc << endl;
-                }
-#endif                
-                speedTelescope = speedTelescopeLoc;
-                cout << "Telescope speed update: " << speedTelescope << endl;
-            }
-        }
-    }
-            
-    Point2i arcsecondsSpeed = static_cast<Point2i>(speedTelescope);
-	arcsecondsSpeed.y = -arcsecondsSpeed.y;
-    
-    Point2i arcsecondsSpeedLimited;
-	arcsecondsSpeedLimited = speedMax( arcsecondsSpeed );
-
-    if( manualPos2 == false )
-	{
-		position2->setVariableAzm(arcsecondsSpeedLimited.x);
-		position2->setVariableAlt(arcsecondsSpeedLimited.y);
-	}
-
-    return;
-}
-
 void ObjectControl::process()
 {
     controlPositionExt();
@@ -581,8 +418,11 @@ int ObjectControl::processMsg()
                     size_t endchar = sub.find(';');
                     if( endchar != string::npos )
                     {
-                        string width = sub.substr(startchar+1, xchar-1); 
-                        string height = sub.substr(xchar+1, endchar-1); 
+                        int len = 0;
+                        len = xchar - (startchar+1);
+                        string width = sub.substr(startchar+1, len); 
+                        len = endchar - (xchar+1);
+                        string height = sub.substr(xchar+1, len); 
                         double dwidth = (double)stoi(width);
                         double dheight = (double)stoi(height);
                         init(dwidth, dheight);
@@ -603,8 +443,11 @@ int ObjectControl::processMsg()
                     size_t endchar = sub.find(';');
                     if( endchar != string::npos )
                     {
-                        string width = sub.substr(startchar+1, xchar-1); 
-                        string height = sub.substr(xchar+1, endchar-1); 
+                        int len = 0;
+                        len = xchar - (startchar+1);
+                        string width = sub.substr(startchar+1, len); 
+                        len = endchar - (xchar+1);
+                        string height = sub.substr(xchar+1, len); 
                         inPos.x = (double)stod(width);
                         inPos.y = (double)stod(height);
                         //cout << "inPos: " << inPos << endl;
@@ -679,6 +522,65 @@ int ObjectControl::processMsg()
             position2->setFixedAzm( 0 );
             position2->setFixedRateAzm( 1 );
             manualPos2 = false;
+        } 
+        
+        if( (pos = rec.rfind("Goto")) != string::npos )
+        {
+            if( (pos = rec.rfind("GotoOrAzm=")) != string::npos )
+            {
+                string sub = rec.substr(pos+10);
+                double azm = (double)stod(sub);
+                cout << "GotoOrAzm: " << azm << endl;
+                orientation.az = azm;
+            }   
+            else
+            if( (pos = rec.rfind("GotoOrAlt=")) != string::npos )
+            {
+                string sub = rec.substr(pos+10);
+                double alt = (double)stod(sub);
+                cout << "GotoOrAlt: " << alt << endl;
+                orientation.alt = alt;
+            }  
+            else
+            if( (pos = rec.rfind("GotoObj1=")) != string::npos )
+            {
+                size_t endchar = rec.find(';');
+                if( endchar != string::npos )
+                {
+                    int len = endchar - (pos+9);
+                    string sub = rec.substr(pos+9, len);
+                    cout << "GotoObj1: " << sub << endl;
+                    calcRaDecFromSolarObj(sub);
+                }
+            } 
+            else
+            if( (pos = rec.rfind("GotoObj2=")) != string::npos )
+            {
+                size_t endchar = rec.find(';');
+                if( endchar != string::npos )
+                {
+                    int len = endchar - (pos+9);
+                    string sub = rec.substr(pos+9, len);
+                    cout << "GotoObj2: " << sub << endl;
+                    calcRaDecFromSpaceObj(sub);
+                }
+            }
+        } 
+        
+        if( (pos = rec.rfind("LocN=")) != string::npos )
+        {
+            string sub = rec.substr(pos+5);
+            double north = (double)stod(sub);
+            cout << "LocN: " << north << endl;
+            location.lat = north;
+        }   
+        
+        if( (pos = rec.rfind("LocE=")) != string::npos )
+        {
+            string sub = rec.substr(pos+5);
+            double east = (double)stod(sub);
+            cout << "LocE: " << east << endl;
+            location.lng = east;
         }  
         
         if( (pos = rec.find("exit")) != string::npos )
@@ -702,6 +604,51 @@ int ObjectControl::processMsg()
     }
     
     return ret;
+}
+
+
+void ObjectControl::calcRaDecFromSolarObj(string obj)
+{
+    double JD;
+	
+    cout << "calcRaDecFromSolarObj: " << obj << endl;
+     
+	/* get the julian day from the local system time */
+	JD = ln_get_julian_from_sys();
+	cout << "Julian day: " << JD << endl;
+	
+	if (obj == "Moon")
+    {
+        ln_get_lunar_equ_coords(JD, &objRaDec);
+    }
+    else
+    if (obj == "Mars") 
+    {
+        ln_get_mars_equ_coords(JD, &objRaDec);
+    }
+    else
+    if (obj == "Jupiter")
+    {
+        ln_get_jupiter_equ_coords(JD, &objRaDec); 
+    }
+    else
+    if (obj == "Saturn")
+    {
+        ln_get_saturn_equ_coords(JD, &objRaDec);
+    }
+    else
+    {
+        objRaDec.ra = 0.0;
+        objRaDec.dec = 0.0;
+    }
+    
+    cout << "Solar object Ra: " << objRaDec.ra << ", Dec: " << objRaDec.dec << endl;
+    
+    return;
+}
+
+void ObjectControl::calcRaDecFromSpaceObj(string obj)
+{
 }
 
 Point2i ObjectControl::speedLimit(Point2i speed)

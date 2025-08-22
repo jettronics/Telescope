@@ -23,10 +23,8 @@
 #include <raspicam/raspicam.h>
 #include <linux/joystick.h>
 
-#include "setup.h"
 #include "tcpsocketcom.h"
 #include "procmessage.h"
-#include "focus.h"
 #include "position.h"
 #include "objectcontrol.h"
 #include "camera.h"
@@ -41,17 +39,10 @@
 
 
 CameraProperties::CameraProperties()
-#ifdef TELESCOPE_8SE
     : widthVideo(1280) //1441 
     , widthVideoOld(1280)
     , heightVideo(960) //1080
     , heightVideoOld(960) //1080
-#else
-    : widthVideo(640) //1441 
-    , widthVideoOld(640)
-    , heightVideo(480) //1080
-    , heightVideoOld(480) //1080
-#endif
     , widthImage(4056)
     , heightImage(3040)
     , brightness(50) //[0,100]
@@ -59,11 +50,7 @@ CameraProperties::CameraProperties()
     , saturation(50) //[0,100]
     , gain(50) //[0,100]
     , exposure(-1) //[1,100] shutter speed from 0 to 33ms
-#ifdef TELESCOPE_8SE
     , fpsVideo(20)
-#else
-    , fpsVideo(10)
-#endif
     , fpsImage(3)
 {
     
@@ -77,7 +64,6 @@ Camera::Camera()
     : writer(nullptr)
     , control(nullptr)
     , stream(nullptr)
-    , focus(nullptr)
     , procMsg(nullptr)
     , videoMode(true)
     , photoStable(STABLE_PHOTO_SHOT)
@@ -121,7 +107,6 @@ Camera::Camera( TcpSocketCom *control, TcpSocketCom *stream, ProcMessage *proc, 
     : writer(nullptr)
     , control(control)
     , stream(stream)
-    , focus(nullptr)
     , procMsg(proc)
     , posMsg(posmsg)
     , position(nullptr)
@@ -538,13 +523,9 @@ int Camera::process( void )
         cam.grab();
         cam.retrieve(imagein);
         // Mirror image y-axis
-#ifdef TELESCOPE_8SE
         //flip(imagein, imageout, -1);
         imageout = imagein.clone();
         //bitwise_not(imageout, imageout);
-#else
-        flip(imagein, imageout, 1);
-#endif
         
         imagetrack = imageout.clone();
         //imageproc = imagetrack.clone();
@@ -628,27 +609,6 @@ int Camera::process( void )
                 posMsg->sendClientToServer(strSend);
             }
             
-#ifdef FOCUS_yes
-            if( enAutoFocus == true )
-            {
-                string recFoc = procMsg->receiveClientFromServer();
-                if( recFoc.length() > 1 )
-                {
-                    size_t pos;
-                    if( (pos = recFoc.rfind("autodone")) != string::npos )
-                    {
-                        focusColor = Scalar(0,165,255);
-                        enAutoFocus = false;
-                    }
-                }
-            }
-            calcFocus();
-            if( enAutoFocus == true )
-            {
-                sendFocus();
-            }
-#endif
-          
             if( recordVideo == true )
             {
                 if( writer != nullptr )
@@ -1274,16 +1234,6 @@ int Camera::setControl( string prop )
 
     if( (pos = prop.rfind("Position")) != string::npos )
     {
-#if defined(COMM_RS232_yes) && defined(COMM_USB_yes)
-        if( (pos = prop.rfind("Positionsel=")) != string::npos )
-        {
-            string sub = prop.substr(pos+12);
-            cout << "Positionsel: " << (int)stoi(sub) << endl;
-            //position->setFixedRate( (char)stoi(sub) );
-            string strSend = "sel=" + sub;
-            posMsg->sendClientToServer(strSend);
-        } 
-#endif
         if( (pos = prop.rfind("Positionspeed=")) != string::npos )
         {
             string sub = prop.substr(pos+14);
@@ -1387,57 +1337,6 @@ int Camera::setControl( string prop )
         } 
     }
     else
-#ifdef FOCUS_yes
-    if( (pos = prop.rfind("Focus")) != string::npos )
-    {
-        if( (pos = prop.rfind("Focusauto=true")) != string::npos )
-        {
-            cout << "Focus auto: on" << endl;
-            enAutoFocus = true;
-            //meanFocus = 0.0;
-            focusColor = Scalar(0,0,255);
-            procMsg->sendClientToServer("autoon");
-        }   
-        else
-        if( (pos = prop.rfind("Focusauto=false")) != string::npos )
-        {
-            cout << "Focus auto: off" << endl;
-            //meanFocus = 0.0;
-            enAutoFocus = false;
-            focusColor = Scalar(0,165,255);   
-            procMsg->sendClientToServer("autooff");
-        } 
-        else
-        if( (pos = prop.rfind("Focusrun=left")) != string::npos )
-        {
-            cout << "Focus run: left" << endl;
-            //meanFocus = 0.0;
-            procMsg->sendClientToServer("runleft");
-        }   
-        else
-        if( (pos = prop.rfind("Focusrun=right")) != string::npos )
-        {
-            cout << "Focus run: right" << endl;
-            //meanFocus = 0.0;
-            procMsg->sendClientToServer("runright");
-        } 
-        else
-        if( (pos = prop.rfind("Focusstep=left")) != string::npos )
-        {
-            cout << "Focus step: left" << endl;
-            //meanFocus = 0.0;
-            procMsg->sendClientToServer("stepleft");
-        }   
-        else
-        if( (pos = prop.rfind("Focusstep=right")) != string::npos )
-        {
-            cout << "Focus step: right" << endl;
-            //meanFocus = 0.0;
-            procMsg->sendClientToServer("stepright");
-        }  
-    }
-    else
-#endif
 #ifdef PICTURE_yes
     if( (pos = prop.rfind("Display")) != string::npos )
     {
@@ -1595,6 +1494,37 @@ int Camera::setControl( string prop )
         }
     }
     else
+    if( (pos = prop.rfind("Goto")) != string::npos )
+    {
+        if( (pos = prop.rfind("GotoOrAzm=")) != string::npos )
+        {
+            string sub = prop.substr(pos);
+            //cout << "GotoOrAzm: " << (int)stoi(sub) << endl;
+            posMsg->sendClientToServer(sub);
+        }   
+        else
+        if( (pos = prop.rfind("GotoOrAlt=")) != string::npos )
+        {
+            string sub = prop.substr(pos);
+            //cout << "GotoOrAzm: " << (int)stoi(sub) << endl;
+            posMsg->sendClientToServer(sub);
+        }  
+        else
+        if( (pos = prop.rfind("GotoObj1=")) != string::npos )
+        {
+            string sub = prop.substr(pos);
+            //cout << "GotoObj1: " << sub << endl;
+            posMsg->sendClientToServer(sub);
+        } 
+        else
+        if( (pos = prop.rfind("GotoObj2=")) != string::npos )
+        {
+            string sub = prop.substr(pos);
+            //cout << "GotoObj2: " << sub << endl;
+            posMsg->sendClientToServer(sub);
+        }
+    }
+    else
     {
         if( (pos = prop.rfind("Zoom=")) != string::npos )
         {
@@ -1656,7 +1586,7 @@ int Camera::setControl( string prop )
         
         if( (pos = prop.rfind("Resolution")) != string::npos )
         {
-            string sub = prop.substr(pos+10);
+            string sub = prop.substr(pos+10); 
             string width = sub.substr(sub.find('=')+1, sub.find('x')-1); 
             string height = sub.substr(sub.find('x')+1, sub.find(';')-1); 
             camProps.widthVideo = (double)stoi(width);
@@ -1665,7 +1595,21 @@ int Camera::setControl( string prop )
             cameraState = 0;
             stopVideoRecord();
             cam.release();
-        }    
+        } 
+        
+        if( (pos = prop.rfind("LocN=")) != string::npos )
+        {
+            string sub = prop.substr(pos);
+            //cout << "LocN: " << (double)stod(sub) << endl;
+            posMsg->sendClientToServer(sub);
+        }   
+        
+        if( (pos = prop.rfind("LocE=")) != string::npos )
+        {
+            string sub = prop.substr(pos);
+            //cout << "LocE: " << (double)stod(sub) << endl;
+            posMsg->sendClientToServer(sub);
+        }   
     }
     
     return ret;

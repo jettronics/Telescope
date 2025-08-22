@@ -67,7 +67,6 @@ private:
    VideoWriter *writer;
    TcpSocketCom *control;
    TcpSocketCom *stream;
-   Focus *focus;
    ProcMessage *procMsg;
    ProcMessage *posMsg;
    Position *position;

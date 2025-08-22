@@ -4,6 +4,14 @@
 using namespace std;
 using namespace cv;
 
+#include <libnova/lunar.h>
+#include <libnova/mars.h>
+#include <libnova/jupiter.h>
+#include <libnova/saturn.h>
+#include <libnova/julian_day.h>
+#include <libnova/rise_set.h>
+#include <libnova/transform.h>
+
 #define DT_SAMPLES   8
 
 class ObjectControl
@@ -27,7 +35,9 @@ private:
    void measureCycleTime();
    void controlPosition();
    void controlPositionExt();
-   void controlSpeed();
+   ln_hrz_posn convertRaDec2AzmAlt();
+   void calcRaDecFromSolarObj(string obj);
+   void calcRaDecFromSpaceObj(string obj);
    
 private:
    Position *position;
@@ -56,6 +66,12 @@ private:
    struct timespec start, end;
    double normFactor;
    bool speedObjectMeasured;
+   String solarObj;
+   String spaceObj;
+   ln_equ_posn objRaDec;
+   ln_lnlat_posn location;
+   ln_hrz_posn orientation;
+   
 };
 
 
