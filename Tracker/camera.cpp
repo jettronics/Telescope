@@ -1523,6 +1523,13 @@ int Camera::setControl( string prop )
             //cout << "GotoObj2: " << sub << endl;
             posMsg->sendClientToServer(sub);
         }
+        else
+        if( (pos = prop.rfind("GotoState=")) != string::npos )
+        {
+            string sub = prop.substr(pos);
+            //cout << "GotoState: " << sub << endl;
+            posMsg->sendClientToServer(sub);
+        }
     }
     else
     {

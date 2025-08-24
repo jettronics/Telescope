@@ -473,6 +473,12 @@ void Position::setVariableAlt( int alt )
     return;    
 }
 
+void Position::setGotoAzmAlt( double azm, double alt )
+{
+    cout << "Goto Azm: " << azm << ", Alt: " << alt << endl;
+    return;
+}
+
 
 void Position::process()
 {

@@ -35,7 +35,7 @@ private:
    void measureCycleTime();
    void controlPosition();
    void controlPositionExt();
-   ln_hrz_posn convertRaDec2AzmAlt();
+   void convertRaDec2AzmAlt();
    void calcRaDecFromSolarObj(string obj);
    void calcRaDecFromSpaceObj(string obj);
    
@@ -71,6 +71,7 @@ private:
    ln_equ_posn objRaDec;
    ln_lnlat_posn location;
    ln_hrz_posn orientation;
+   ln_hrz_posn positionAzmAlt;
    
 };
 

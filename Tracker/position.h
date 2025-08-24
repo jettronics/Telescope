@@ -25,6 +25,7 @@ public:
    char getFixedRateAlt() { return fixedRateAlt; }
    void setVariableAzm( int azm );
    void setVariableAlt( int alt );
+   void setGotoAzmAlt( double azm, double alt );
    ModeType getMode();
    
 protected:

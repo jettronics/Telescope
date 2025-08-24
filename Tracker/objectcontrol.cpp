@@ -109,6 +109,8 @@ ObjectControl::ObjectControl(Position *position, Position *position2, ProcMessag
 	location.lng = 0.0; /* E */
     orientation.alt = 0.0;
     orientation.az = 0.0;
+    positionAzmAlt.alt = 0.0;
+    positionAzmAlt.az = 0.0;
 }
 
 
@@ -551,6 +553,7 @@ int ObjectControl::processMsg()
                     string sub = rec.substr(pos+9, len);
                     cout << "GotoObj1: " << sub << endl;
                     calcRaDecFromSolarObj(sub);
+                    convertRaDec2AzmAlt();
                 }
             } 
             else
@@ -563,7 +566,14 @@ int ObjectControl::processMsg()
                     string sub = rec.substr(pos+9, len);
                     cout << "GotoObj2: " << sub << endl;
                     calcRaDecFromSpaceObj(sub);
+                    convertRaDec2AzmAlt();
                 }
+            }
+            else
+            if( (pos = rec.rfind("GotoState=start")) != string::npos )
+            {
+                cout << "GotoState: start" << endl;
+                position2->setGotoAzmAlt( positionAzmAlt.az, positionAzmAlt.alt );
             }
         } 
         
@@ -649,6 +659,36 @@ void ObjectControl::calcRaDecFromSolarObj(string obj)
 
 void ObjectControl::calcRaDecFromSpaceObj(string obj)
 {
+    size_t midchar = obj.find(',');
+    if( midchar != string::npos )
+    {
+        int len = 0;
+        len = midchar;
+        string Ra = obj.substr(0, len); 
+        len = obj.length() - (midchar+1);
+        string Dec = obj.substr(midchar+1, len); 
+        objRaDec.ra = (double)stod(Ra);
+        objRaDec.dec = (double)stod(Dec);
+        
+        cout << "Space object Ra: " << objRaDec.ra << ", Dec: " << objRaDec.dec << endl;
+    }
+    return;
+}
+
+void ObjectControl::convertRaDec2AzmAlt()
+{
+    double JD;
+	
+    cout << "convertRaDec2AzmAlt: " << endl;
+     
+	/* get the julian day from the local system time */
+	JD = ln_get_julian_from_sys();
+    
+    ln_get_hrz_from_equ(&objRaDec, &location, JD, &positionAzmAlt);
+    
+    cout << "Object Azm: " << positionAzmAlt.az << ", Alt: " << positionAzmAlt.alt << endl;
+
+    return;
 }
 
 Point2i ObjectControl::speedLimit(Point2i speed)
