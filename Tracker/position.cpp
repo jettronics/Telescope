@@ -5,6 +5,8 @@
 #include <iostream>
 #include <fcntl.h>
 #include <fstream>
+#include <sstream>
+#include <iomanip>
 #include <unistd.h>
 #include <time.h>
 #include <sys/time.h>
@@ -13,6 +15,7 @@
 #include <termios.h>
 #include <vector>
 #include <array>
+#include <string.h>
 
 #include "setup.h"
 #include "position.h"
@@ -476,6 +479,30 @@ void Position::setVariableAlt( int alt )
 void Position::setGotoAzmAlt( double azm, double alt )
 {
     cout << "Goto Azm: " << azm << ", Alt: " << alt << endl;
+    if( alt > 0.0 )
+    {
+        int azmConv = 0; 
+        if( azm > 0.0 )
+        {
+            azmConv = (int)((azm * (double)46603.38) + (double)0.5);
+        }
+        else
+        {
+            azmConv = (int)((azm * (double)46603.38) - (double)0.5);
+        }
+        int altConv = (int)((alt * (double)46603.38) + (double)0.5);
+        stringstream azmConvHex;
+        azmConvHex << uppercase << setfill('0') << setw(6) << hex << azmConv;
+        stringstream altConvHex;
+        altConvHex << uppercase << setfill('0') << setw(6) << hex << altConv;
+        cout << "Azm hex: " << azmConvHex.str() << ", Alt hex: " << altConvHex.str() << endl;
+        for( int i = 0; i < 6; i++ )
+        {
+            arrBufGoto[i+1] = (char)azmConvHex.str()[i];
+            arrBufGoto[i+10] = (char)altConvHex.str()[i];
+        }
+        gotoActive = 1;
+    }
     return;
 }
 

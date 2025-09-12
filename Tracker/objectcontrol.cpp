@@ -533,7 +533,14 @@ int ObjectControl::processMsg()
                 string sub = rec.substr(pos+10);
                 double azm = (double)stod(sub);
                 cout << "GotoOrAzm: " << azm << endl;
-                orientation.az = azm;
+                // Smartphone app 0° = North, 180° = South, -90° = West, 90° = East
+                // Libnova 180° = North, 0° = South, 90° = West, 270° = East
+                double conv = azm + 180.0;
+                if( conv >= 360.0 )
+                {
+                    conv = 0.0;
+                }
+                orientation.az = conv;
             }   
             else
             if( (pos = rec.rfind("GotoOrAlt=")) != string::npos )
@@ -573,7 +580,9 @@ int ObjectControl::processMsg()
             if( (pos = rec.rfind("GotoState=start")) != string::npos )
             {
                 cout << "GotoState: start" << endl;
-                position2->setGotoAzmAlt( positionAzmAlt.az, positionAzmAlt.alt );
+                double azmDelta = positionAzmAlt.az - orientation.az;
+                double altDelta = positionAzmAlt.alt - orientation.alt;
+                position2->setGotoAzmAlt( azmDelta, altDelta );
             }
         } 
         
