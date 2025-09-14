@@ -81,6 +81,8 @@ ObjectControl::ObjectControl(Position *position, Position *position2, ProcMessag
     , speedUpdateTime(0.0)
     , normFactor(1.0)
     , speedObjectMeasured(false)
+    , followFlag(false)
+    , followUpdateTime(0.0)
 {
     speedFieldOut[0] = 0;
     speedFieldOut[1] = 0;
@@ -111,6 +113,8 @@ ObjectControl::ObjectControl(Position *position, Position *position2, ProcMessag
     orientation.az = 0.0;
     positionAzmAlt.alt = 0.0;
     positionAzmAlt.az = 0.0;
+    positionAzmAltPrev.alt = 0.0;
+    positionAzmAltPrev.az = 0.0;
 }
 
 
@@ -380,11 +384,36 @@ void ObjectControl::controlPositionExt()
     return;
 }
 
-
-void ObjectControl::process()
+void ObjectControl::followPositionExt()
 {
-    controlPositionExt();
-	return;
+    
+    if( followUpdateTime >= 2.0 )
+    {
+        convertRaDec2AzmAlt();
+        double deltaAzm = positionAzmAlt.az - positionAzmAltPrev.az;
+        double deltaAlt = positionAzmAlt.alt - positionAzmAltPrev.alt;
+        cout << "Delta Azm: " << deltaAzm << ", Alt: " << deltaAlt << endl;
+        
+        double arcsecsAzmD = deltaAzm * (double)3600.0/followUpdateTime;
+        double arcsecsAltD = deltaAlt * (double)3600.0/followUpdateTime;
+        int arsecsAzm = (int)((arcsecsAzmD)+(double)0.5);
+        int arsecsAlt = (int)((arcsecsAltD)+(double)0.5);
+        if( arcsecsAzmD < 0.0 )
+        {
+            arsecsAzm = (int)((arcsecsAzmD)-(double)0.5);
+        }
+        if( arcsecsAltD < 0.0 )
+        {
+            arsecsAlt = (int)((arcsecsAltD)-(double)0.5);
+        }
+        
+        
+        cout << "arcsec/s Azm: " << arsecsAzm << ", Alt: " << arsecsAlt << endl;
+        positionAzmAltPrev.alt = positionAzmAlt.alt;
+        positionAzmAltPrev.az = positionAzmAlt.az;
+        followUpdateTime = 0.0;
+    }
+    
 }
 
 int ObjectControl::processMsg()
@@ -561,6 +590,7 @@ int ObjectControl::processMsg()
                     cout << "GotoObj1: " << sub << endl;
                     calcRaDecFromSolarObj(sub);
                     convertRaDec2AzmAlt();
+                    followUpdateTime = 0.0;
                 }
             } 
             else
@@ -574,15 +604,39 @@ int ObjectControl::processMsg()
                     cout << "GotoObj2: " << sub << endl;
                     calcRaDecFromSpaceObj(sub);
                     convertRaDec2AzmAlt();
+                    followUpdateTime = 0.0;
                 }
             }
             else
             if( (pos = rec.rfind("GotoState=start")) != string::npos )
             {
                 cout << "GotoState: start" << endl;
-                double azmDelta = positionAzmAlt.az - orientation.az;
+                positionAzmAltPrev.alt = positionAzmAlt.alt;
+                positionAzmAltPrev.az = positionAzmAlt.az;
+                
                 double altDelta = positionAzmAlt.alt - orientation.alt;
+                double azmDelta = positionAzmAlt.az - orientation.az;
+                if( azmDelta < 0.0 )
+                {
+                    azmDelta = 360.0 - azmDelta;
+                }
+
                 position2->setGotoAzmAlt( azmDelta, altDelta );
+                //followUpdateTime = 0.0;
+                followFlag = false;
+            }
+            else
+            if( (pos = rec.rfind("GotoState=follow")) != string::npos )
+            {
+                cout << "GotoState: follow" << endl;
+                //followUpdateTime = 0.0;
+                followFlag = true;
+            }
+            else
+            if( (pos = rec.rfind("GotoState=stop")) != string::npos )
+            {
+                cout << "GotoState: stop" << endl;
+                followFlag = false;
             }
         } 
         
@@ -619,8 +673,13 @@ int ObjectControl::processMsg()
     
     if( trackFlag == true )
     {
-        process();
+        controlPositionExt();
     }
+    followUpdateTime += dt;
+    if( followFlag == true )
+    {
+        followPositionExt();
+    }    
     
     return ret;
 }

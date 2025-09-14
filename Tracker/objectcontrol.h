@@ -26,7 +26,6 @@ public:
 public:
    void init(double width, double height);
    void deInit();
-   void process();
    int processMsg();
 
 private:
@@ -38,6 +37,7 @@ private:
    void convertRaDec2AzmAlt();
    void calcRaDecFromSolarObj(string obj);
    void calcRaDecFromSpaceObj(string obj);
+   void followPositionExt();
    
 private:
    Position *position;
@@ -71,8 +71,9 @@ private:
    ln_equ_posn objRaDec;
    ln_lnlat_posn location;
    ln_hrz_posn orientation;
-   ln_hrz_posn positionAzmAlt;
-   
+   ln_hrz_posn positionAzmAlt, positionAzmAltPrev;
+   bool followFlag;
+   double followUpdateTime;
 };
 
 
