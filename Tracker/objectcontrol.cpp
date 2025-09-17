@@ -407,11 +407,21 @@ void ObjectControl::followPositionExt()
             arsecsAlt = (int)((arcsecsAltD)-(double)0.5);
         }
         
-        
         cout << "arcsec/s Azm: " << arsecsAzm << ", Alt: " << arsecsAlt << endl;
         positionAzmAltPrev.alt = positionAzmAlt.alt;
         positionAzmAltPrev.az = positionAzmAlt.az;
         followUpdateTime = 0.0;
+        
+        Point2i arcsecondsSpeed;
+        arcsecondsSpeed.x = ((int)positionAzmAlt.az + (double)0.5);
+        arcsecondsSpeed.y = ((int)positionAzmAlt.alt + (double)0.5);
+        
+        if( manualPos2 == false )
+        {
+            position2->setVariableAzm(arcsecondsSpeed.x);
+            position2->setVariableAlt(arcsecondsSpeed.y);
+        }
+        
     }
     
 }
@@ -636,6 +646,11 @@ int ObjectControl::processMsg()
             if( (pos = rec.rfind("GotoState=stop")) != string::npos )
             {
                 cout << "GotoState: stop" << endl;
+                position2->setFixedAlt( 0 );
+                position2->setFixedRateAlt( 1 );
+                position2->setFixedAzm( 0 );
+                position2->setFixedRateAzm( 1 );
+                manualPos2 = false;
                 followFlag = false;
             }
         } 
