@@ -4,7 +4,7 @@
 using namespace std;
 using namespace cv;
 
-#define MEDIAN_FILTER_SIZE  7 //9 //11
+#define MEDIAN_FILTER_SIZE  5 //7 //9 //11
 
 class CameraProperties
 {
@@ -44,7 +44,7 @@ public:
    int process();
    
 private:
-   struct DotTrackingType {int index; double distance; double area; Point2d pnt;};
+   struct DotTrackingType {int index; double distance; double area; Point2d pnt; Point2d ctrl;};
     
 private:
    int setControl( string prop );
@@ -104,6 +104,7 @@ private:
    int joystButtonXState;
    int joystButtonSelectState;
    bool initObjectFlow;
+   bool manCentreCtrl;
    //vector<double> osci1;
    //Ptr<plot::Plot2d> plot1;
 };

@@ -66,7 +66,7 @@ ObjectControl::ObjectControl(Position *position, Position *position2, ProcMessag
     , Td(0.5) //Object speed -> 8 entries every 0.25s = 2s -> 0.5 1/s
     , width(0)
     , height(0)
-    , arcsecondPerPixel(4.1,3.8) //31.0,28.9
+    , arcsecondPerPixel(3.85, 3.85) //31.0,28.9
     , arcsecondsSpeedLimitedOld(0,0)
     , initFlag(true)
     , trackFlag(false)
@@ -146,7 +146,7 @@ void ObjectControl::init(double width, double height)
     cout << "arcsecondPerPixel = " << arcsecondPerPixel << endl;
     cout << dec << "Init inPos = " << inPos << endl;
     
-    initFlag = true;
+    //initFlag = true;
 }
 
 void ObjectControl::deInit()
@@ -300,7 +300,7 @@ void ObjectControl::controlPositionExt()
             ctrlPos = inPosNew;
         }
         inDiff = inPosNew - ctrlPos;
-        
+#if 0        
         Point2d diffObject = inPosNew - inPosOld;
         Point2d diffArcObject;
         diffArcObject.x = arcsecondPerPixel.x * diffObject.x;
@@ -323,11 +323,12 @@ void ObjectControl::controlPositionExt()
                 inDiff = inDiffOld;
             }
         }
-                
+#endif                
         inArcDiff.x = arcsecondPerPixel.x * inDiff.x;
         inArcDiff.y = arcsecondPerPixel.y * inDiff.y;
         
-        speedCentre = 0.1 * inArcDiff;
+        //speedCentre = 0.1 * inArcDiff;
+        speedCentre = 0.2 * inArcDiff;
               
         inDiffOld = inDiff;
         inPosOld = inPosNew;
@@ -492,8 +493,12 @@ int ObjectControl::processMsg()
                         inPos.x = (double)stod(width);
                         inPos.y = (double)stod(height);
                         //cout << "inPos: " << inPos << endl;
-                        trackFlag = true;
-                        predictCalc = false;
+                        if( trackFlag == false )
+                        {
+                            initFlag = true;
+                            trackFlag = true;
+                            predictCalc = false;
+                        }
                     }
                 }
             }

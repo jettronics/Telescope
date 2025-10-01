@@ -101,6 +101,7 @@ Camera::Camera()
     dotTracking.distance = 0.0;
     dotTracking.index = 0;
     dotTracking.pnt = Point2d(0.0,0.0);
+    dotTracking.ctrl = Point2d(0.0,0.0);
 }
 
 Camera::Camera( TcpSocketCom *control, TcpSocketCom *stream, ProcMessage *proc, ProcMessage *posmsg )
@@ -141,12 +142,14 @@ Camera::Camera( TcpSocketCom *control, TcpSocketCom *stream, ProcMessage *proc, 
     , joystButtonXState(0)
     , joystButtonSelectState(0)
     , initObjectFlow(true)
+    , manCentreCtrl(false)
 {
     objectControl = nullptr;
     dotTracking.area = 0.0;
     dotTracking.distance = 0.0;
     dotTracking.index = 0;
     dotTracking.pnt = Point2d(0.0,0.0);
+    dotTracking.ctrl = Point2d(0.0,0.0);
 
 /*        
     osci1.clear();
@@ -282,9 +285,9 @@ int Camera::handleJoystickEvents(string *msgEvents)
                     {
                         // Increase Speed
                         joystPosSpeedX++;
-                        if( joystPosSpeedX > 15 )
+                        if( joystPosSpeedX > 17 )
                         {
-                            joystPosSpeedX = 15;
+                            joystPosSpeedX = 17;
                         }
                         string posStr = "PositionspeedX=" + to_string(joystPosSpeedX) + ";";
                         (*msgEvents) += posStr;
@@ -347,9 +350,9 @@ int Camera::handleJoystickEvents(string *msgEvents)
                     {
                         // Increase Speed
                         joystPosSpeedY++;
-                        if( joystPosSpeedY > 15 )
+                        if( joystPosSpeedY > 17 )
                         {
-                            joystPosSpeedY = 15;
+                            joystPosSpeedY = 17;
                         }
                         string posStr = "PositionspeedY=" + to_string(joystPosSpeedY) + ";";
                         (*msgEvents) += posStr;
@@ -457,6 +460,7 @@ int Camera::process( void )
                 roipt.x = camProps.widthVideo / 2;
                 roipt.y = camProps.heightVideo / 2;
                 dotTracking.pnt = roipt;
+                dotTracking.ctrl = roipt;
                 roiColor = Scalar(255,255,255);
             }
             else
@@ -466,6 +470,7 @@ int Camera::process( void )
                 roipt.x = roipt.x * camProps.widthVideo / camProps.widthVideoOld;
                 roipt.y = roipt.y * camProps.heightVideo / camProps.heightVideoOld;
                 dotTracking.pnt = roipt;
+                dotTracking.ctrl = roipt;
                 runTracker = false;
                 initTracker = true;
                 roiColor = Scalar(0,255,0);
@@ -525,7 +530,7 @@ int Camera::process( void )
         // Mirror image y-axis
         //flip(imagein, imageout, -1);
         imageout = imagein.clone();
-        //bitwise_not(imageout, imageout);
+        bitwise_not(imageout, imageout);
         
         imagetrack = imageout.clone();
         //imageproc = imagetrack.clone();
@@ -607,6 +612,12 @@ int Camera::process( void )
                 strSend = "roipt=" + strx + "x" + stry + ";";
                 //cout << "strSend: " << strSend << endl;
                 posMsg->sendClientToServer(strSend);
+                
+                if( manCentreCtrl == true )
+                {
+                    dotTracking.ctrl = dotTracking.pnt;
+                }
+                drawMarker( imagetrack, dotTracking.ctrl, Scalar(255,255,0), MARKER_CROSS, (int)(50.0*drawScale), 2, 1 );
             }
             
             if( recordVideo == true )
@@ -620,6 +631,58 @@ int Camera::process( void )
             else
             {
                 rectangle( imagetrack, roi, roiColor, 2*drawScale, 1 );
+                
+                if( joystHorState > 0 )
+                {
+                    // Right
+                    if( enableTracker == true )
+                    {
+                        arrowedLine( imagetrack, Point(75,75), Point(125,75), Scalar(0,255,255), 4, 1, 0, 0.3 );
+                    }
+                    else
+                    {
+                        arrowedLine( imageout, Point(75,75), Point(125,75), Scalar(0,255,255), 4, 1, 0, 0.3 );
+                    }
+                }
+                else
+                if( joystHorState < 0 )
+                {
+                    // Left
+                    if( enableTracker == true )
+                    {
+                        arrowedLine( imagetrack, Point(75,75), Point(25,75), Scalar(0,255,255), 4, 1, 0, 0.3 );
+                    }
+                    else
+                    {
+                        arrowedLine( imageout, Point(75,75), Point(25,75), Scalar(0,255,255), 4, 1, 0, 0.3 );
+                    }
+                }
+                
+                if( joystVertState > 0 )
+                {
+                    // Down
+                    if( enableTracker == true )
+                    {
+                        arrowedLine( imagetrack, Point(75,75), Point(75,125), Scalar(0,255,255), 4, 1, 0, 0.3 );
+                    }
+                    else
+                    {
+                        arrowedLine( imageout, Point(75,75), Point(75,125), Scalar(0,255,255), 4, 1, 0, 0.3 );
+                    }
+                }
+                else
+                if( joystVertState < 0 )
+                {
+                    // Up
+                    if( enableTracker == true )
+                    {
+                        arrowedLine( imagetrack, Point(75,75), Point(75,25), Scalar(0,255,255), 4, 1, 0, 0.3 );
+                    }
+                    else
+                    {
+                        arrowedLine( imageout, Point(75,75), Point(75,25), Scalar(0,255,255), 4, 1, 0, 0.3 );
+                    }
+                }
             }
         }
         
@@ -1266,6 +1329,10 @@ int Camera::setControl( string prop )
             cout << "Position: up" << endl;
             //position->setFixedAlt( 1 );
             posMsg->sendClientToServer("alt=1");
+            if( runControl == true )
+            {
+                manCentreCtrl = true;
+            }
         }  
         
         if( (pos = prop.rfind("Position=down")) != string::npos )
@@ -1273,6 +1340,10 @@ int Camera::setControl( string prop )
             cout << "Position: down" << endl;
             //position->setFixedAlt( -1 );
             posMsg->sendClientToServer("alt=-1");
+            if( runControl == true )
+            {
+                manCentreCtrl = true;
+            }
         }  
         
         if( (pos = prop.rfind("Position=left")) != string::npos )
@@ -1280,6 +1351,10 @@ int Camera::setControl( string prop )
             cout << "Position: left" << endl;
             //position->setFixedAzm( -1 );
             posMsg->sendClientToServer("azm=-1");
+            if( runControl == true )
+            {
+                manCentreCtrl = true;
+            }
         }  
         
         if( (pos = prop.rfind("Position=right")) != string::npos )
@@ -1287,6 +1362,10 @@ int Camera::setControl( string prop )
             cout << "Position: right" << endl;
             //position->setFixedAzm( 1 );
             posMsg->sendClientToServer("azm=1");
+            if( runControl == true )
+            {
+                manCentreCtrl = true;
+            }
         }  
         
         if( (pos = prop.rfind("Position=stopud")) != string::npos )
@@ -1294,6 +1373,7 @@ int Camera::setControl( string prop )
             cout << "Position: stop up/down" << endl;
             //position->setFixedAlt( 0 );
             posMsg->sendClientToServer("alt=0");
+            manCentreCtrl = false;
         }  
         
         if( (pos = prop.rfind("Position=stoplr")) != string::npos )
@@ -1301,11 +1381,11 @@ int Camera::setControl( string prop )
             cout << "Position: stop left/right" << endl;
             //position->setFixedAzm( 0 );
             posMsg->sendClientToServer("azm=0");
+            manCentreCtrl = false;
         }  
         
         if( (pos = prop.rfind("Position=roiup")) != string::npos )
         {
-            
             roiSize += 0.01;
             if( roiSize > 0.8 ) //0.5
             {
@@ -1471,6 +1551,7 @@ int Camera::setControl( string prop )
                     string strSend = "init=" + to_string((int)camProps.widthVideo) + "x" + 
                                      to_string((int)camProps.heightVideo) + ";";
                     posMsg->sendClientToServer(strSend);
+                    dotTracking.ctrl = dotTracking.pnt;
                 }
                 else
                 {
