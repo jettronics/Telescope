@@ -136,7 +136,7 @@ void Position::init()
 void PositionUsb::init()
 {
     cout << "Position usb init" << endl;
-
+    
 #if 0    
     //arrSend.clear();
     

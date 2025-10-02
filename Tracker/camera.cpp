@@ -530,7 +530,7 @@ int Camera::process( void )
         // Mirror image y-axis
         //flip(imagein, imageout, -1);
         imageout = imagein.clone();
-        bitwise_not(imageout, imageout);
+        //bitwise_not(imageout, imageout);
         
         imagetrack = imageout.clone();
         //imageproc = imagetrack.clone();

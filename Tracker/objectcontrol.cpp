@@ -395,6 +395,11 @@ void ObjectControl::followPositionExt()
         double deltaAlt = positionAzmAlt.alt - positionAzmAltPrev.alt;
         cout << "Delta Azm: " << deltaAzm << ", Alt: " << deltaAlt << endl;
         
+        orientation.az = positionAzmAlt.az;
+        orientation.alt = positionAzmAlt.alt;
+        
+        cout << "Orientation: azm=" << orientation.az << ", alt=" << orientation.alt << endl;
+        
         double arcsecsAzmD = deltaAzm * (double)3600.0/followUpdateTime;
         double arcsecsAltD = deltaAlt * (double)3600.0/followUpdateTime;
         int arsecsAzm = (int)((arcsecsAzmD)+(double)0.5);
@@ -408,14 +413,15 @@ void ObjectControl::followPositionExt()
             arsecsAlt = (int)((arcsecsAltD)-(double)0.5);
         }
         
-        cout << "arcsec/s Azm: " << arsecsAzm << ", Alt: " << arsecsAlt << endl;
         positionAzmAltPrev.alt = positionAzmAlt.alt;
         positionAzmAltPrev.az = positionAzmAlt.az;
         followUpdateTime = 0.0;
         
         Point2i arcsecondsSpeed;
-        arcsecondsSpeed.x = ((int)positionAzmAlt.az + (double)0.5);
-        arcsecondsSpeed.y = ((int)positionAzmAlt.alt + (double)0.5);
+        arcsecondsSpeed.x = (int)(arsecsAzm + (double)0.5);
+        arcsecondsSpeed.y = (int)(arsecsAlt + (double)0.5);
+        
+        cout << "arcsec/s Azm: " << arcsecondsSpeed.x << ", Alt: " << arcsecondsSpeed.y << endl;
         
         if( manualPos2 == false )
         {
@@ -577,14 +583,29 @@ int ObjectControl::processMsg()
                 string sub = rec.substr(pos+10);
                 double azm = (double)stod(sub);
                 cout << "GotoOrAzm: " << azm << endl;
-                // Smartphone app 0° = North, 180° = South, -90° = West, 90° = East
-                // Libnova 180° = North, 0° = South, 90° = West, 270° = East
-                double conv = azm + 180.0;
+                // SkyView app 0° = North, 180° = South, -90° = West,  90° = East
+                // Libnova   180° = North,   0° = South,  90° = West, 270° = East
+                /*double conv = azm + 180.0;
                 if( conv >= 360.0 )
                 {
                     conv = 0.0;
+                }*/
+                
+                // AltAz app   0° = North, 180° = South, 270° = West,  90° = East
+                // Libnova   180° = North,   0° = South,  90° = West, 270° = East
+                double conv = 0.0;
+                if( (azm >= 0.0) && (azm < 180.0) )
+                {
+                    conv = azm + 180.0;
+                }
+                else
+                if( (azm >= 180.0) && (azm < 360.0) )
+                {
+                    conv = azm - 180.0;
                 }
                 orientation.az = conv;
+                //telscpoffset.az = conv;
+                cout << "orientation.az: " << orientation.az << endl;
             }   
             else
             if( (pos = rec.rfind("GotoOrAlt=")) != string::npos )
@@ -593,6 +614,7 @@ int ObjectControl::processMsg()
                 double alt = (double)stod(sub);
                 cout << "GotoOrAlt: " << alt << endl;
                 orientation.alt = alt;
+                //telscpoffset.alt = alt;
             }  
             else
             if( (pos = rec.rfind("GotoObj1=")) != string::npos )
@@ -631,11 +653,13 @@ int ObjectControl::processMsg()
                 
                 double altDelta = positionAzmAlt.alt - orientation.alt;
                 double azmDelta = positionAzmAlt.az - orientation.az;
-                if( azmDelta < 0.0 )
-                {
-                    azmDelta = 360.0 - azmDelta;
-                }
-
+                
+                orientation.az = positionAzmAlt.az;
+                orientation.alt = positionAzmAlt.alt;
+                cout << "New orientation: azm=" << orientation.az << ", alt=" << orientation.alt << endl;
+                
+                // To Do: Calculate Telescope Azm/Alt coordinates
+                                
                 position2->setGotoAzmAlt( azmDelta, altDelta );
                 //followUpdateTime = 0.0;
                 followFlag = false;
@@ -733,6 +757,11 @@ void ObjectControl::calcRaDecFromSolarObj(string obj)
     if (obj == "Saturn")
     {
         ln_get_saturn_equ_coords(JD, &objRaDec);
+    }
+    else
+    if (obj == "Merkur")
+    {
+        ln_get_mercury_equ_coords(JD, &objRaDec);
     }
     else
     {

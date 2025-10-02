@@ -8,6 +8,7 @@ using namespace cv;
 #include <libnova/mars.h>
 #include <libnova/jupiter.h>
 #include <libnova/saturn.h>
+#include <libnova/mercury.h>
 #include <libnova/julian_day.h>
 #include <libnova/rise_set.h>
 #include <libnova/transform.h>
