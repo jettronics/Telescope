@@ -109,8 +109,10 @@ ObjectControl::ObjectControl(Position *position, Position *position2, ProcMessag
     objRaDec.dec = 0.0;
     location.lat = 0.0; /* N */
 	location.lng = 0.0; /* E */
-    orientation.alt = 0.0;
-    orientation.az = 0.0;
+    positionTelescope.alt = 0.0;
+    positionTelescope.az = 0.0;
+    positionTelescopeOffset.alt = 0.0;
+    positionTelescopeOffset.az = 0.0;
     positionAzmAlt.alt = 0.0;
     positionAzmAlt.az = 0.0;
     positionAzmAltPrev.alt = 0.0;
@@ -395,10 +397,15 @@ void ObjectControl::followPositionExt()
         double deltaAlt = positionAzmAlt.alt - positionAzmAltPrev.alt;
         cout << "Delta Azm: " << deltaAzm << ", Alt: " << deltaAlt << endl;
         
-        orientation.az = positionAzmAlt.az;
-        orientation.alt = positionAzmAlt.alt;
+        positionTelescope.az = positionAzmAlt.az - positionTelescopeOffset.az;
+        if( positionAzmAlt.az < positionTelescopeOffset.az )
+        {
+            positionTelescope.az += 360.0;
+        }
         
-        cout << "Orientation: azm=" << orientation.az << ", alt=" << orientation.alt << endl;
+        positionTelescope.alt = positionAzmAlt.alt - positionTelescopeOffset.alt;
+        
+        cout << "Telescope position: azm=" << positionTelescope.az << ", alt=" << positionTelescope.alt << endl;
         
         double arcsecsAzmD = deltaAzm * (double)3600.0/followUpdateTime;
         double arcsecsAltD = deltaAlt * (double)3600.0/followUpdateTime;
@@ -603,9 +610,9 @@ int ObjectControl::processMsg()
                 {
                     conv = azm - 180.0;
                 }
-                orientation.az = conv;
-                //telscpoffset.az = conv;
-                cout << "orientation.az: " << orientation.az << endl;
+                positionTelescope.az = 0.0;
+                positionTelescopeOffset.az = conv;
+                cout << "positionTelescopeOffset.az: " << positionTelescopeOffset.az << endl;
             }   
             else
             if( (pos = rec.rfind("GotoOrAlt=")) != string::npos )
@@ -613,8 +620,8 @@ int ObjectControl::processMsg()
                 string sub = rec.substr(pos+10);
                 double alt = (double)stod(sub);
                 cout << "GotoOrAlt: " << alt << endl;
-                orientation.alt = alt;
-                //telscpoffset.alt = alt;
+                positionTelescopeOffset.alt = alt;
+                positionTelescope.alt = 0.0;
             }  
             else
             if( (pos = rec.rfind("GotoObj1=")) != string::npos )
@@ -648,19 +655,22 @@ int ObjectControl::processMsg()
             if( (pos = rec.rfind("GotoState=start")) != string::npos )
             {
                 cout << "GotoState: start" << endl;
+                
                 positionAzmAltPrev.alt = positionAzmAlt.alt;
                 positionAzmAltPrev.az = positionAzmAlt.az;
                 
-                double altDelta = positionAzmAlt.alt - orientation.alt;
-                double azmDelta = positionAzmAlt.az - orientation.az;
+                positionTelescope.az = positionAzmAlt.az - positionTelescopeOffset.az;
                 
-                orientation.az = positionAzmAlt.az;
-                orientation.alt = positionAzmAlt.alt;
-                cout << "New orientation: azm=" << orientation.az << ", alt=" << orientation.alt << endl;
+                if( positionAzmAlt.az < positionTelescopeOffset.az )
+                {
+                    positionTelescope.az += 360.0;
+                }
                 
-                // To Do: Calculate Telescope Azm/Alt coordinates
-                                
-                position2->setGotoAzmAlt( azmDelta, altDelta );
+                positionTelescope.alt = positionAzmAlt.alt - positionTelescopeOffset.alt;
+ 
+                cout << "New telescope position azm=" << positionTelescope.az << ", alt=" << positionTelescope.alt << endl;
+                                                
+                position2->setGotoAzmAlt( positionTelescope.az, positionTelescope.alt );
                 //followUpdateTime = 0.0;
                 followFlag = false;
             }

@@ -71,7 +71,7 @@ private:
    String spaceObj;
    ln_equ_posn objRaDec;
    ln_lnlat_posn location;
-   ln_hrz_posn orientation;
+   ln_hrz_posn positionTelescope, positionTelescopeOffset;
    ln_hrz_posn positionAzmAlt, positionAzmAltPrev;
    bool followFlag;
    double followUpdateTime;
